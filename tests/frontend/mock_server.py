@@ -74,13 +74,13 @@ def usage(calls=12):
 
 def summary(lid: str) -> dict:
     if lid == LID:
-        return {"id": LID, "title": "Lecture 07 caches", "filename": "lecture-07-caches.pdf", "created": "2026-11-09T12:00:00Z",
+        return {"id": LID, "subject": "DPHPC", "title": "Lecture 07 caches", "filename": "lecture-07-caches.pdf", "created": "2026-11-09T12:00:00Z",
                 "n_slides": N, "status": "incomplete" if False else "ready",
                 "prep": {"done": N, "total": N, "running": False, "errors": {}, "generating": [], "message": None, "paused_until": None},
                 "context_files": [{"name": "prev-lecture.pdf", "chars": 41000}], "usage": usage()}
     done = min(N, prep_calls["n"] // 2)
     st = "preparing" if done < N else "ready"
-    return {"id": LID2, "title": "Lecture 08 virtual memory", "filename": "lecture-08-vm.pdf", "created": "2026-11-10T12:00:00Z",
+    return {"id": LID2, "subject": "Architecture", "title": "Lecture 08 virtual memory", "filename": "lecture-08-vm.pdf", "created": "2026-11-10T12:00:00Z",
             "n_slides": N, "status": st,
             "prep": {"done": done, "total": N, "running": st == "preparing", "errors": {}, "generating": [done + 1] if st == "preparing" else [],
                      "message": "Usage limit reached — resumes 14:00" if st == "preparing" and done == 3 else None, "paused_until": None},
@@ -135,9 +135,11 @@ class H(BaseHTTPRequestHandler):
         if path.startswith("/static/"):
             return self.file(STATIC / path[len("/static/"):])
         if path == "/api/status":
-            return self.send_json({"playwright_pdf": True, "notes_model": "m", "chat_model": "m", "concurrency": 3,
+            return self.send_json({"playwright_pdf": True, "notes_model": "m", "chat_model": "m", "concurrency": 3, "lectures_dir": "/home/me/lectures", "loose_pdfs": ["DPHPC/lecture09.pdf", "slides.pdf"],
                                    "rate_limit": {"five_hour": {"utilization": 0.45, "resets_at": 1794224400, "status": "allowed"},
                                                   "seven_day": {"utilization": 0.5, "resets_at": 1794224400, "status": "allowed"}}})
+        if path == "/api/subjects":
+            return self.send_json([{"name": "Analysis", "lectures": 0}, {"name": "Architecture", "lectures": 1}, {"name": "DPHPC", "lectures": 1}])
         if path == "/api/lectures":
             return self.send_json([summary(LID2), summary(LID)])
         m = re.fullmatch(r"/api/lectures/([^/]+)(/.*)?", path)
@@ -188,6 +190,10 @@ class H(BaseHTTPRequestHandler):
         mm = re.fullmatch(r"/api/lectures/([^/]+)/slides/(\d+)/ask", path)
         if mm:
             return self.ask(int(mm.group(2)), json.loads(body or b"{}"))
+        if path == "/api/lectures":
+            if b'name="subject"' not in body:
+                return self.send_json({"detail": "subject is required"}, 400)
+            return self.send_json(summary(LID2))
         if path.endswith("/prepare"):
             return self.send_json(summary(LID2))
         self.send_json({"detail": "mock: not supported"}, 400)

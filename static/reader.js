@@ -44,9 +44,15 @@
     var l = state.lecture;
     if (!l) return;
     var title = l.title || l.filename || id;
-    $('title').textContent = title;
-    $('title').title = title;
-    document.title = title + ' · Slide Tutor';
+    var t = $('title');
+    t.textContent = '';
+    if (l.subject) {
+      t.appendChild(el('span', { class: 'subject', text: l.subject }));
+      t.appendChild(el('span', { class: 'sep', text: ' › ' }));
+    }
+    t.appendChild(document.createTextNode(title));
+    t.title = (l.subject ? l.subject + ' › ' : '') + title;
+    document.title = (l.subject ? l.subject + ' › ' : '') + title + ' · Slide Tutor';
     $('print-link').setAttribute('href', '/lecture/' + ST.enc(id) + '/print');
 
     var p = l.prep || {};

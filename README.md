@@ -9,9 +9,10 @@ No API key, no per-token billing; usage counts against your plan's limits.
 
 ## What matters
 
-- **One folder per lecture.** Each lecture lives in `lectures/<any name>/`, and that folder holds everything: the
-  PDF, the generated notes as plain Markdown (`notes/001.md`, …), your chats and the printable handout. Drop a
-  folder in and it's picked up within a few seconds. Delete or move it and it's gone from the app.
+- **A folder per subject, a folder per lecture.** Each lecture lives in `lectures/<Subject>/<Lecture>/`, and that
+  folder holds everything: the PDF, the generated notes as plain Markdown (`notes/001.md`, …), your chats and the
+  printable handout. Drop a folder in and it's picked up within a few seconds; the library groups lectures by
+  subject. Delete or move a folder and the app follows.
 - **Notes are pre-generated and resumable.** Stop the server whenever you like; on restart it continues with the
   missing slides only. Finished notes are never regenerated unless you click **Regenerate** on that slide.
 - **Every question carries the slide.** The chat request always contains the current slide's image (1600 px), its
@@ -46,18 +47,25 @@ Without uv (Python ≥ 3.12): `pip install -r requirements.txt && python app.py`
 
 ### 1. Add a lecture
 
-Either **make a folder**:
+Either **make the folders**:
 
 ```
 lectures/
-  Lecture 08 Roofline/            ← any name; it becomes the lecture title
-    lecture08.pdf                 ← the slide deck (the PDF directly in the folder)
-    context/                      ← optional extra material
-      lecture07.pdf
-      exercise-sheet-8.pdf
+  DPHPC/                            ← a subject: any name
+    Lecture 08 Roofline/            ← a lecture: any name, it becomes the title
+      lecture08.pdf                 ← the slide deck (the PDF directly in the lecture folder)
+      context/                      ← optional extra material
+        lecture07.pdf
+        exercise-sheet-8.pdf
+    Lecture 09 Cache Coherence/
+      lecture09.pdf
+  Analysis II/
+    Week 3 Integrals/
+      slides.pdf
 ```
 
-or **upload in the browser**: the library page (`/`) has an upload form, which creates the same folder for you.
+or **upload in the browser**: the library page (`/`) has an upload form with a subject field (pick an existing
+subject or type a new one), which creates the same folders for you.
 
 The app renders the slides, extracts the text and starts writing notes. A progress bar shows *n / total*.
 
@@ -66,7 +74,9 @@ The app renders the slides, extracts the text and starts writing notes. A progre
   before notes are generated, or regenerate afterwards.
 - To add context first and start later, run with `AUTO_PREPARE=0` (or untick *Start preparing notes immediately* when
   uploading), then press **Prepare lecture** once the folder is complete.
-- If a folder has several PDFs at the top level, the largest one is the deck.
+- If a lecture folder has several PDFs at its top level, the largest one is the deck.
+- A PDF placed directly in `lectures/` or in a subject folder is ignored (the library lists such files): every
+  lecture needs its own folder.
 
 ### 2. Read
 
@@ -97,13 +107,13 @@ per page until the notes fit, down to 8 pt; longer notes continue on a second pa
 
 ### Removing a lecture
 
-**Delete** in the library moves the folder to `lectures/.deleted/` (recoverable). Deleting or moving the folder
+**Delete** in the library moves the lecture folder to `lectures/.deleted/` (recoverable). Deleting or moving the folder
 yourself works too.
 
 ## What's in a lecture folder
 
 ```
-lectures/<name>/
+lectures/<Subject>/<Lecture>/
   <deck>.pdf            your slides
   context/*.pdf         your extra material
   notes/NNN.md          generated notes: plain Markdown, edit them freely
@@ -116,7 +126,8 @@ lectures/<name>/
     logs/requests.jsonl                    what was sent with each request (see below)
 ```
 
-You can rename the folder at any time. The lecture keeps its id, so links and the remembered slide survive.
+You can rename lecture and subject folders, or move a lecture to another subject, at any time. The lecture keeps
+its id, so links and the remembered slide survive, and its title follows the folder name.
 
 ## Customising
 
@@ -134,7 +145,7 @@ Environment variables (all optional):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `LECTURES_DIR` | `./lectures` | where lecture folders live (e.g. a folder in your course directory) |
+| `LECTURES_DIR` | `./lectures` | where subject folders live (e.g. a folder in your study directory) |
 | `AUTO_PREPARE` | `1` | `0`: new folders are processed but notes wait for **Prepare lecture** |
 | `NOTES_MODEL` / `CHAT_MODEL` | `claude-sonnet-5-5` | model for notes / chat |
 | `NOTES_EFFORT` / `CHAT_EFFORT` | `medium` | `low` … `max`; higher means more thinking and more plan usage |
@@ -182,14 +193,14 @@ uv run python tests/frontend/check_render.py          # Markdown/KaTeX rendering
 uv run python tests/screenshots.py <lecture-id>       # screenshots of library, reader and print view
 ```
 
-To try the app without a real lecture, copy the test deck into a folder: `mkdir -p "lectures/Test" && cp
-tests/fixtures/test_lecture.pdf lectures/Test/`.
+To try the app without a real lecture, copy the test deck into a folder: `mkdir -p "lectures/Demo/Test" && cp
+tests/fixtures/test_lecture.pdf lectures/Demo/Test/`.
 
 ## Troubleshooting
 
 - *"Claude Code CLI not found"* or authentication errors: run `claude`, log in, and check `claude auth status`.
-- *A new folder doesn't show up*: the PDF must be directly inside `lectures/<name>/`, not nested deeper, and is
-  picked up a few seconds after it has finished copying. Folder names starting with `.` or `_` are ignored.
+- *A new lecture doesn't show up*: the PDF must be directly inside `lectures/<Subject>/<Lecture>/`, and is picked
+  up a few seconds after it has finished copying. Folder names starting with `.` or `_` are ignored.
 - *A slide's notes failed*: the error is shown on that slide. Press **Prepare lecture** to retry failed slides, or
   **Regenerate** for one slide.
 - *Paused*: your plan's usage window is used up, and the job resumes after the reset time shown.

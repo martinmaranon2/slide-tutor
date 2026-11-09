@@ -1,15 +1,16 @@
-"""On-disk storage: one folder per lecture.
+"""On-disk storage: a folder per subject, inside it a folder per lecture.
 
     lectures/                     (LECTURES_DIR, default ./lectures)
-      <any folder name>/          one lecture; you choose the name
-        <slides>.pdf              the slide deck: the PDF directly in the folder (largest one if several)
-        context/*.pdf             optional extra material (previous lecture, exercise sheet)
-        notes/NNN.md              generated study notes (plain Markdown, editable)
-        handout.pdf               written by "Download PDF"
-        .tutor/                   app state: meta.json, text.json, usage.json, slides/, chat/, logs/, context-text/
+      <Subject>/                  e.g. "DPHPC"; any name
+        <Lecture>/                one lecture; any name (it becomes the title)
+          <slides>.pdf            the slide deck: the PDF directly in the folder (largest one if several)
+          context/*.pdf           optional extra material (previous lecture, exercise sheet)
+          notes/NNN.md            generated study notes (plain Markdown, editable)
+          handout.pdf             written by "Download PDF"
+          .tutor/                 app state: meta.json, text.json, usage.json, slides/, chat/, logs/, context-text/
 
-New folders are discovered by scan(). Lecture ids (used in URLs) are a slug of the folder name, stored in meta so
-they stay stable. All writes are atomic (tmp file + os.replace). Everything that mutates meta runs on the single
+New folders are discovered by scan(). Lecture ids (used in URLs) are a slug of "<subject> <lecture>", stored in meta
+so they stay stable when folders are renamed or moved to another subject. All writes are atomic (tmp file + os.replace). Everything that mutates meta runs on the single
 asyncio event-loop thread without an await between read and write.
 """
 from __future__ import annotations
@@ -113,9 +114,49 @@ def _settled(p: Path) -> bool:
         return False
 
 
+def _hidden(p: Path) -> bool:
+    return p.name.startswith((".", "_"))
+
+
+def subject_dirs() -> list[Path]:
+    return sorted((d for d in LECTURES.iterdir() if d.is_dir() and not _hidden(d)), key=lambda d: d.name.lower())
+
+
+def subject_of(lid: str) -> str:
+    return folder(lid).parent.name
+
+
+def subjects() -> list[dict]:
+    """[{name, lectures}] for every subject folder, including empty ones."""
+    counts: dict[Path, int] = {}
+    for lid in list_ids():
+        counts[_index[lid].parent] = counts.get(_index[lid].parent, 0) + 1
+    return [{"name": d.name, "lectures": counts.get(d, 0)} for d in subject_dirs()]
+
+
+def loose_pdfs() -> list[str]:
+    """PDFs that sit outside a lecture folder (directly in lectures/ or in a subject folder) and are ignored."""
+    out = [p.name for p in _pdfs(LECTURES)]
+    for subj in subject_dirs():
+        out += [f"{subj.name}/{p.name}" for p in _pdfs(subj)]
+    return out
+
+
+def safe_dirname(name: str) -> str:
+    """A subject/lecture folder name from user input; ValueError if nothing usable is left."""
+    base = re.sub(r"[^\w .()&+,-]+", "_", name.replace("/", "-").replace("\\", "-")).strip(" ._")
+    if not re.search(r"[^\W_]", base):                 # needs at least one letter or digit
+        raise ValueError("invalid folder name")
+    return base[:80]
+
+
 def pick_deck(d: Path) -> Path | None:
     pdfs = _pdfs(d)
     return max(pdfs, key=lambda p: p.stat().st_size) if pdfs else None
+
+
+def _base_id(d: Path) -> str:
+    return slugify(f"{d.parent.name} {d.name}")
 
 
 def _unique_id(base: str, own: Path) -> str:
@@ -131,24 +172,26 @@ def scan() -> list[str]:
     processing. Folders whose PDF is still being copied are skipped until it has settled."""
     new: list[str] = []
     seen: set[Path] = set()
-    for d in sorted(LECTURES.iterdir()):
-        if not d.is_dir() or d.name.startswith((".", "_")):
-            continue
+    lecture_dirs = [d for subj in subject_dirs() for d in sorted(subj.iterdir()) if d.is_dir() and not _hidden(d)]
+    for d in lecture_dirs:
         seen.add(d)
         meta = read_json(d / APP_DIR / "meta.json")
         if meta:
             lid = meta.get("id") or slugify(d.name)
             other = _index.get(lid)
             if other is not None and other != d and (other / APP_DIR / "meta.json").exists():
-                lid = _unique_id(slugify(d.name), d)        # folder was copied: give the copy its own id
+                lid = _unique_id(_base_id(d), d)            # folder was copied: give the copy its own id
                 meta["id"] = lid
                 write_json(d / APP_DIR / "meta.json", meta)
             _index[lid] = d                                  # (a renamed folder keeps its id)
+            if meta.get("title") != d.name:                  # ...and the title follows the folder name
+                meta["title"] = d.name
+                write_json(d / APP_DIR / "meta.json", meta)
             continue
         deck = pick_deck(d)
         if not deck or not _settled(deck):
             continue
-        lid = _unique_id(slugify(d.name), d)
+        lid = _unique_id(_base_id(d), d)
         _index[lid] = d
         register(lid, deck.name, title=d.name)
         new.append(lid)
@@ -166,19 +209,20 @@ def register(lid: str, deck_name: str, title: str, autostart: bool | None = None
     return meta
 
 
-def new_folder_for_upload(filename: str) -> Path:
-    """lectures/<pdf name without extension>[ (2)]/ for a lecture uploaded through the browser."""
+def new_folder_for_upload(subject: str, filename: str) -> Path:
+    """lectures/<subject>/<pdf name without extension>[ (2)]/ for a lecture uploaded through the browser."""
+    subj = LECTURES / safe_dirname(subject)
     base = Path(safe_filename(filename)).stem.strip() or "lecture"
-    d, i = LECTURES / base, 2
+    d, i = subj / base, 2
     while d.exists():
-        d = LECTURES / f"{base} ({i})"
+        d = subj / f"{base} ({i})"
         i += 1
     d.mkdir(parents=True)
     return d
 
 
 def add_to_index(d: Path) -> str:
-    lid = _unique_id(slugify(d.name), d)
+    lid = _unique_id(_base_id(d), d)
     _index[lid] = d
     return lid
 
@@ -188,7 +232,7 @@ def delete_lecture(lid: str) -> Path:
     d = folder(lid)
     trash = LECTURES / ".deleted"
     trash.mkdir(exist_ok=True)
-    dest = trash / f"{d.name} {datetime.now().strftime('%Y-%m-%d %H%M%S')}"
+    dest = trash / f"{d.parent.name} - {d.name} {datetime.now().strftime('%Y-%m-%d %H%M%S')}"
     shutil.move(str(d), str(dest))
     _index.pop(lid, None)
     return dest

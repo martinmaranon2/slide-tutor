@@ -16,6 +16,7 @@
     try {
       var s = await ST.api('/api/status');
       if (s.lectures_dir) document.getElementById('lectures-dir').textContent = s.lectures_dir;
+      showLoose(s.loose_pdfs || []);
       var info = ST.rateLimitInfo(s.rate_limit);
       if (info) {
         planEl.textContent = info.text;
@@ -25,6 +26,17 @@
         planEl.hidden = true;
       }
     } catch (e) { planEl.hidden = true; }
+  }
+
+  function showLoose(list) {
+    var box = document.getElementById('loose-warning');
+    if (!list.length) { box.hidden = true; return; }
+    box.replaceChildren(
+      el('div', { text: 'These PDFs are ignored because they are not inside a lecture folder:' }),
+      el('ul', {}, list.map(function (p) { return el('li', {}, el('code', { text: p })); })),
+      el('div', { text: 'Each lecture needs its own folder inside a subject folder, e.g. ' }, el('code', { text: '<Subject>/<Lecture>/slides.pdf' }), '.')
+    );
+    box.hidden = false;
   }
 
   /* ---------- cards ---------- */
@@ -169,38 +181,71 @@
   function removeCard(id) {
     var c = cards.get(id);
     if (c) { c.root.remove(); cards.delete(id); }
-    if (!cards.size) showEmpty();
+    lastLayout = null;
+    load();
   }
   function showEmpty() {
-    if (!listEl.querySelector('.empty')) listEl.replaceChildren(el('div', { class: 'empty', text: 'No lectures yet. Upload a PDF above to get started.' }));
+    if (!listEl.querySelector('.empty')) { lastLayout = null; listEl.replaceChildren(el('div', { class: 'empty', text: 'No lectures yet. Upload a PDF above to get started.' })); }
   }
+
+  var subjects = [];      // [{name, lectures}] from /api/subjects
+  var lastLayout = null;  // signature of the grouped DOM structure
+
+  function natCmp(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }); }
 
   function render(lectures) {
     var seen = new Set();
-    var prev = null;
-    var empty = listEl.querySelector('.empty');
-    if (lectures.length && empty) empty.remove();
     lectures.forEach(function (l) {
       seen.add(l.id);
       if (!cards.has(l.id)) buildCard(l);
-      var c = cards.get(l.id);
       update(l);
-      // keep DOM order = API order (newest first) without recreating nodes
-      var expectedNext = prev ? prev.nextSibling : listEl.firstChild;
-      if (c.root !== expectedNext) listEl.insertBefore(c.root, expectedNext);
-      prev = c.root;
     });
-    Array.from(cards.keys()).forEach(function (id) { if (!seen.has(id)) removeCard(id); });
-    if (!lectures.length) showEmpty();
+    Array.from(cards.keys()).forEach(function (id) { if (!seen.has(id)) { cards.get(id).root.remove(); cards.delete(id); } });
+
+    var groups = new Map(); // subject -> [lecture]
+    subjects.forEach(function (s) { groups.set(s.name, []); });
+    lectures.forEach(function (l) {
+      var name = l.subject || '(no subject)';
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(l);
+    });
+    var names = Array.from(groups.keys()).sort(natCmp);
+    var layout = names.map(function (n) {
+      return n + ':' + groups.get(n).sort(function (a, b) {
+        return natCmp(a.title || a.filename || a.id, b.title || b.filename || b.id) || natCmp(a.id, b.id);
+      }).map(function (l) { return l.id; }).join(',');
+    }).join('|');
+    if (layout === lastLayout) return;
+    lastLayout = layout;
+
+    if (!lectures.length && !subjects.length) { showEmpty(); return; }
+    listEl.replaceChildren.apply(listEl, names.map(function (n) {
+      var ls = groups.get(n);
+      var body = ls.length
+        ? el('div', { class: 'lectures' }, ls.map(function (l) { return cards.get(l.id).root; }))
+        : el('div', { class: 'subject-empty', text: 'No lectures yet' });
+      return el('section', { class: 'subject-section', dataset: { subject: n } },
+        el('h2', { class: 'subject-title', text: n }), body);
+    }));
+  }
+
+  async function loadSubjects() {
+    try {
+      subjects = await ST.api('/api/subjects');
+      var dl = document.getElementById('subject-list');
+      dl.replaceChildren.apply(dl, subjects.map(function (s) { return el('option', { value: s.name }); }));
+    } catch (e) { /* older backend: fall back to subjects derived from lectures */ }
   }
 
   /* ---------- polling ---------- */
   var lastList = [];
+  var subjectsLoaded = false;
   async function load() {
     if (inFlight) return;
     inFlight = true;
     try {
       lastList = await ST.api('/api/lectures');
+      if (!subjectsLoaded || lastList.length !== cards.size) { subjectsLoaded = true; await loadSubjects(); }
       render(lastList);
     } catch (e) {
       if (!cards.size) listEl.replaceChildren(el('div', { class: 'empty err', text: 'Could not load lectures: ' + e.message }));
@@ -224,7 +269,10 @@
     ev.preventDefault();
     var file = document.getElementById('file').files[0];
     if (!file) { msg.textContent = 'Choose a PDF first.'; return; }
+    var subject = document.getElementById('subject').value.trim();
+    if (!subject) { msg.classList.add('err'); msg.textContent = 'Enter a subject.'; return; }
     var fd = new FormData();
+    fd.append('subject', subject);
     fd.append('file', file);
     Array.prototype.forEach.call(document.getElementById('context').files, function (f) { fd.append('context', f); });
     fd.append('autostart', document.getElementById('autostart').checked ? 'true' : 'false');
@@ -233,7 +281,9 @@
     msg.textContent = 'Uploading…';
     try {
       await ST.api('/api/lectures', { method: 'POST', body: fd });
+      try { localStorage.setItem('st.lastSubject', subject); } catch (e2) {}
       form.reset();
+      document.getElementById('subject').value = subject;
       document.getElementById('autostart').checked = true;
       msg.textContent = 'Uploaded.';
       lastList = [{ status: 'processing' }];
@@ -246,6 +296,7 @@
     } finally { btn.disabled = false; }
   });
 
+  try { var ls = localStorage.getItem('st.lastSubject'); if (ls) document.getElementById('subject').value = ls; } catch (e) {}
   loadStatus();
   load();
 })();

@@ -78,7 +78,7 @@ def summary(lid: str) -> dict:
     prep["generating"] = sorted(jobs.generating(lid))
     return {
         "id": meta["id"], "title": meta["title"], "filename": meta.get("deck"), "created": meta["created"],
-        "folder": str(storage.folder(lid)),
+        "subject": storage.subject_of(lid), "folder": str(storage.folder(lid)),
         "n_slides": meta.get("n_slides") or 0, "status": meta["status"], "prep": prep,
         "context_files": meta.get("context_files", []), "usage": storage.usage_summary(lid),
     }
@@ -157,6 +157,7 @@ async def playwright_available() -> bool:
 async def status():
     return {"playwright_pdf": await playwright_available(), "notes_model": llm.NOTES_MODEL,
             "chat_model": llm.CHAT_MODEL, "concurrency": jobs.CONCURRENCY, "lectures_dir": str(storage.LECTURES),
+            "loose_pdfs": storage.loose_pdfs(),
             "rate_limit": _current_rate_limits() or None, "cli": llm.last_init or None}
 
 
@@ -175,15 +176,24 @@ async def list_lectures():
     return out
 
 
+@app.get("/api/subjects")
+async def list_subjects():
+    return storage.subjects()
+
+
 @app.post("/api/lectures")
 async def upload(file: UploadFile = File(...), context: list[UploadFile] = File(default=[]),
-                 autostart: str = Form("true")):
+                 subject: str = Form(""), autostart: str = Form("true")):
+    try:
+        storage.safe_dirname(subject)
+    except ValueError:
+        raise HTTPException(400, "Choose a subject (the folder the lecture goes into).")
     data = await _read_pdf_upload(file)
     ctx = await _read_context_uploads(context)
     filename = storage.safe_filename(file.filename or "lecture.pdf")
     if not filename.lower().endswith(".pdf"):
         filename += ".pdf"
-    d = storage.new_folder_for_upload(filename)       # lectures/<name>/ just like a hand-made folder
+    d = storage.new_folder_for_upload(subject, filename)   # lectures/<subject>/<name>/ like a hand-made folder
     storage.atomic_write_bytes(d / filename, data)
     lid = storage.add_to_index(d)
     storage.register(lid, filename, title=d.name, autostart=autostart.lower() not in ("false", "0", "no", "off"))

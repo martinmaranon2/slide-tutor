@@ -12,8 +12,9 @@ Server: FastAPI on http://127.0.0.1:8000. All JSON. Slide numbers `n` are **1-ba
 
 Pages get the lecture id from `location.pathname` (`/lecture/<id>` or `/lecture/<id>/print`).
 
-Lectures are folders under `lectures/` (see README). The id is a slug of the folder name, fixed when the folder is
-first seen and stored in `.tutor/meta.json`. Folders created on disk are picked up by a 5-second scan, so a new
+Lectures are folders `lectures/<Subject>/<Lecture>/` (see README). The id is a slug of "<subject> <lecture>", fixed
+when the folder is first seen and stored in `.tutor/meta.json`; it survives renames and moves. The title is the
+lecture folder's name. Folders created on disk are picked up by a 5-second scan, so a new
 lecture can appear in `GET /api/lectures` without any upload call.
 
 ## Shared shapes
@@ -33,7 +34,8 @@ lecture can appear in `GET /api/lectures` without any upload call.
 
 // LectureSummary
 { "id": "lecture-07-caches", "title": "Lecture 07 caches", "filename": "lecture-07-caches.pdf",
-  "folder": "/Users/me/slide-tutor/lectures/Lecture 07 caches",   // the lecture's folder on disk
+  "subject": "DPHPC",                                              // the subject folder's name
+  "folder": "/Users/me/slide-tutor/lectures/DPHPC/Lecture 07 caches",   // the lecture's folder on disk
   "created": "2026-11-09T12:00:00Z", "n_slides": 24,
   "status": "processing|ready_to_prepare|preparing|paused|ready|incomplete|error",
   "prep": Prep, "context_files": [ { "name": "prev-lecture.pdf", "chars": 41000 } ],
@@ -49,9 +51,10 @@ Status meanings: `processing` = PDF being rendered; `ready_to_prepare` = rendere
 
 | Method & path | Request | Response |
 |---|---|---|
-| `GET /api/status` | – | `{ "playwright_pdf": bool, "notes_model": str, "chat_model": str, "concurrency": int, "lectures_dir": str, "rate_limit": { "five_hour": {"utilization": 0.45, "resets_at": 1794224400, "status": "allowed"}, "seven_day": {...} } \| null }` |
+| `GET /api/status` | – | `{ "playwright_pdf": bool, "notes_model": str, "chat_model": str, "concurrency": int, "lectures_dir": str, "loose_pdfs": [str] /* PDFs outside any lecture folder (ignored), relative to lectures_dir */, "rate_limit": { "five_hour": {"utilization": 0.45, "resets_at": 1794224400, "status": "allowed"}, "seven_day": {...} } \| null }` |
 | `GET /api/lectures` | – | `[LectureSummary]` newest first |
-| `POST /api/lectures` | multipart: `file` (PDF, required), `context` (0..n PDFs), `autostart` (`"true"`/`"false"`, default true) | `LectureSummary` (status `processing`) |
+| `GET /api/subjects` | – | `[{"name": "DPHPC", "lectures": 3}]` every subject folder (including empty ones), by name |
+| `POST /api/lectures` | multipart: `file` (PDF, required), `subject` (required; existing or new subject name), `context` (0..n PDFs), `autostart` (`"true"`/`"false"`, default true) | `LectureSummary` (status `processing`); 400 if `subject` is missing/invalid |
 | `GET /api/lectures/{id}` | – | `LectureSummary` + `"slides": [{"n":1,"title":"...","has_notes":true}]` |
 | `DELETE /api/lectures/{id}` | – | `{"ok": true, "moved_to": str}` (the folder is moved to `lectures/.deleted/`, not erased) |
 | `POST /api/lectures/{id}/context` | multipart: `context` (1..n PDFs) | `LectureSummary` |

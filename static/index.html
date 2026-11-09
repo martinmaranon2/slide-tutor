@@ -18,6 +18,12 @@
     <h2>Add a lecture</h2>
     <form id="upload-form">
       <div class="field">
+        <label class="lbl" for="subject">Subject</label>
+        <input id="subject" name="subject" type="text" list="subject-list" required maxlength="100"
+               autocomplete="off" placeholder="e.g. DPHPC (pick one or type a new one)">
+        <datalist id="subject-list"></datalist>
+      </div>
+      <div class="field">
         <label class="lbl" for="file">Lecture slides (PDF)</label>
         <input id="file" name="file" type="file" accept="application/pdf,.pdf" required>
       </div>
@@ -34,9 +40,11 @@
     </form>
   </section>
 
-  <p class="hint folder-hint" id="folder-hint">Or make a folder per lecture in <code id="lectures-dir">lectures/</code>
-    and drop the slide PDF into it (extra material goes in its <code>context/</code> subfolder). New folders are
-    picked up automatically within a few seconds.</p>
+  <p class="hint folder-hint" id="folder-hint">Or organise lectures as folders: put each lecture in
+    <code><span id="lectures-dir">lectures</span>/&lt;Subject&gt;/&lt;Lecture&gt;/</code> with the slide PDF inside
+    (extra material goes in that lecture's <code>context/</code> subfolder). New folders are picked up
+    automatically within a few seconds.</p>
+  <div id="loose-warning" class="warn-box" role="status" hidden></div>
 
   <h2 style="margin-top:28px">Your lectures</h2>
   <div id="lectures" class="lectures"><div class="empty">Loading…</div></div>
