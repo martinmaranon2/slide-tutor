@@ -14,46 +14,51 @@
 </header>
 
 <main class="lib-wrap">
-  <section class="card upload">
-    <h2>Add slides</h2>
-    <form id="upload-form">
-      <div class="field">
-        <label class="lbl" for="subject">Subject</label>
-        <input id="subject" name="subject" type="text" list="subject-list" required maxlength="100"
-               autocomplete="off" placeholder="e.g. DPHPC (pick one or type a new one)">
-        <datalist id="subject-list"></datalist>
-      </div>
-      <div class="field">
-        <span class="lbl">Type</span>
-        <label class="radio"><input type="radio" name="kind" value="lecture" checked> Lecture slides</label>
-        <label class="radio"><input type="radio" name="kind" value="recitation"> Recitation slides</label>
-      </div>
-      <div class="field">
-        <label class="lbl" for="file">Slides (PDF)</label>
-        <input id="file" name="file" type="file" accept="application/pdf,.pdf" required>
-      </div>
-      <div class="field">
-        <label class="lbl" for="context">Context files (previous lecture, exercise sheet)</label>
-        <input id="context" name="context" type="file" accept="application/pdf,.pdf" multiple>
-        <div class="hint">Optional PDFs that help explain the slides.</div>
-      </div>
-      <div class="row">
-        <label><input id="autostart" type="checkbox" checked> Start preparing notes immediately</label>
-        <button id="upload-btn" class="btn btn-primary" type="submit">Upload</button>
-        <span id="form-msg" class="form-msg muted" role="status"></span>
-      </div>
-    </form>
+  <section class="lib-main" aria-labelledby="lib-heading">
+    <h2 id="lib-heading" class="sr-only">Your lectures</h2>
+    <div id="loose-warning" class="warn-box" role="status" hidden></div>
+    <div id="lectures" class="lectures"><div class="empty">Loading…</div></div>
   </section>
 
-  <p class="hint folder-hint" id="folder-hint">Or drop PDFs into
-    <code><span id="lectures-dir">lectures</span>/&lt;Subject&gt;/Lectures/</code> or
-    <code>&lt;Subject&gt;/Recitations/</code>. Each PDF becomes a deck; the results (notes and
-    <code>handout.pdf</code>) appear in <code>&lt;Subject&gt;/Results/</code>. New files are picked up
-    automatically within a few seconds.</p>
-  <div id="loose-warning" class="warn-box" role="status" hidden></div>
+  <aside class="lib-side">
+    <section class="card upload">
+      <h2>Add slides</h2>
+      <form id="upload-form">
+        <div class="field">
+          <label class="lbl" for="subject">Subject</label>
+          <input id="subject" name="subject" type="text" list="subject-list" required maxlength="100"
+                 autocomplete="off" placeholder="e.g. DPHPC (pick one or type a new one)">
+          <datalist id="subject-list"></datalist>
+        </div>
+        <div class="field">
+          <span class="lbl">Type</span>
+          <label class="radio"><input type="radio" name="kind" value="lecture" checked> Lecture slides</label>
+          <label class="radio"><input type="radio" name="kind" value="recitation"> Recitation slides</label>
+        </div>
+        <div class="field">
+          <label class="lbl" for="file">Slides (PDF)</label>
+          <input id="file" name="file" type="file" accept="application/pdf,.pdf" required>
+        </div>
+        <div class="field">
+          <label class="lbl" for="context">Context files (previous lecture, exercise sheet)</label>
+          <input id="context" name="context" type="file" accept="application/pdf,.pdf" multiple>
+          <div class="hint">Optional PDFs that help explain the slides.</div>
+        </div>
+        <div class="row">
+          <label><input id="autostart" type="checkbox" checked> Start preparing notes immediately</label>
+          <button id="upload-btn" class="btn btn-primary" type="submit">Upload</button>
+          <span id="form-msg" class="form-msg muted" role="status"></span>
+        </div>
+      </form>
+    </section>
 
-  <h2 style="margin-top:28px">Your lectures</h2>
-  <div id="lectures" class="lectures"><div class="empty">Loading…</div></div>
+    <div class="hint folder-hint" id="folder-hint">
+      <p>Or drop PDFs into a subject folder; new files are picked up within a few seconds.</p>
+      <code class="path"><span id="lectures-dir">lectures</span>/&lt;Subject&gt;/Lectures/</code>
+      <code class="path">&lt;Subject&gt;/Recitations/</code>
+      <p>Each PDF becomes a deck. Its notes and <code>handout.pdf</code> are written to <code>&lt;Subject&gt;/Results/</code>.</p>
+    </div>
+  </aside>
 </main>
 
 <script src="/static/common.js"></script>
