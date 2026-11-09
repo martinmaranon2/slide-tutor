@@ -1,6 +1,6 @@
 # slide-tutor
 
-A local study assistant for lecture slides. Put a lecture's slide PDF in a folder and it writes study notes for
+A local study assistant for lecture slides. Drop a slide PDF into a subject folder and it writes study notes for
 **every slide** ahead of time. While you read, a chat panel is **tied to the slide on screen**, so you just type
 the question; the slide, its text and its notes are sent along automatically.
 
@@ -9,10 +9,11 @@ No API key, no per-token billing; usage counts against your plan's limits.
 
 ## What matters
 
-- **A folder per subject, a folder per lecture.** Each lecture lives in `lectures/<Subject>/<Lecture>/`, and that
-  folder holds everything: the PDF, the generated notes as plain Markdown (`notes/001.md`, …), your chats and the
-  printable handout. Drop a folder in and it's picked up within a few seconds; the library groups lectures by
-  subject. Delete or move a folder and the app follows.
+- **One folder per subject: your slides in, results out.** Drop PDFs into `lectures/<Subject>/Lectures/` or
+  `lectures/<Subject>/Recitations/`; each PDF is picked up within a few seconds. The results land in
+  `lectures/<Subject>/Results/`: per deck, the notes as plain Markdown (`notes/001.md`, …) and a printable
+  `handout.pdf` that is written automatically once all notes are done. The library groups everything by subject,
+  with lectures and recitations in separate sections.
 - **Notes are pre-generated and resumable.** Stop the server whenever you like; on restart it continues with the
   missing slides only. Finished notes are never regenerated unless you click **Regenerate** on that slide.
 - **Every question carries the slide.** The chat request always contains the current slide's image (1600 px), its
@@ -45,38 +46,45 @@ Without uv (Python ≥ 3.12): `pip install -r requirements.txt && python app.py`
 
 ## How to use it
 
-### 1. Add a lecture
+### 1. Add slides
 
-Either **make the folders**:
+Either **drop PDFs into a subject folder**:
 
 ```
 lectures/
-  DPHPC/                            ← a subject: any name
-    Lecture 08 Roofline/            ← a lecture: any name, it becomes the title
-      lecture08.pdf                 ← the slide deck (the PDF directly in the lecture folder)
-      context/                      ← optional extra material
-        lecture07.pdf
-        exercise-sheet-8.pdf
-    Lecture 09 Cache Coherence/
+  DPHPC/                                ← a subject: any name
+    Lectures/                           ← lecture slides (created for you)
+      lecture08.pdf
       lecture09.pdf
+    Recitations/                        ← recitation / exercise-session slides
+      recitation08.pdf
+    Results/                            ← written by the app
+      Lectures/
+        lecture08/
+          notes/001.md …
+          handout.pdf
+      Recitations/
+        recitation08/ …
   Analysis II/
-    Week 3 Integrals/
-      slides.pdf
+    Lectures/  Recitations/  Results/
 ```
 
-or **upload in the browser**: the library page (`/`) has an upload form with a subject field (pick an existing
-subject or type a new one), which creates the same folders for you.
+To start a new subject, just create its folder (`lectures/Analysis II/`); `Lectures/` and `Recitations/` appear
+inside it within a few seconds.
+
+Or **upload in the browser**: the library page (`/`) has a form with the subject (pick one or type a new name) and
+the type (lecture or recitation slides). It saves the PDF into the same folders.
 
 The app renders the slides, extracts the text and starts writing notes. A progress bar shows *n / total*.
 
-- **Context files** (previous lecture, exercise sheet, script chapter) go in `context/`. Their text is given to the
-  model as reference material for the notes and the chat, and the notes say when they draw on it. Add context files
-  before notes are generated, or regenerate afterwards.
-- To add context first and start later, run with `AUTO_PREPARE=0` (or untick *Start preparing notes immediately* when
-  uploading), then press **Prepare lecture** once the folder is complete.
-- If a lecture folder has several PDFs at its top level, the largest one is the deck.
-- A PDF placed directly in `lectures/` or in a subject folder is ignored (the library lists such files): every
-  lecture needs its own folder.
+- **Context files** (previous lecture, exercise sheet, script chapter) can be attached per deck in the library, or
+  dropped into the deck's `Results/…/<deck>/context/` folder. Their text is given to the model as reference material
+  for the notes and the chat, and the notes say when they draw on it. Add them before notes are generated, or
+  regenerate afterwards.
+- To add context first and start later, run with `AUTO_PREPARE=0` (or untick *Start preparing notes immediately*
+  when uploading), then press **Prepare lecture**.
+- PDFs anywhere else (directly in `lectures/`, in a subject folder, or another subfolder) are ignored; the library
+  lists them so you can move them.
 
 ### 2. Read
 
@@ -103,21 +111,22 @@ The **Ask** tab is a separate thread per slide.
 
 **Print** opens a handout with one A4 page per slide: the slide on top (110 mm wide), notes below. The font shrinks
 per page until the notes fit, down to 8 pt; longer notes continue on a second page rather than being cut. Use
-*Print → Save as PDF*, or **Download PDF**, which also saves `handout.pdf` into the lecture folder.
+*Print → Save as PDF*, or **Download PDF**. The same handout is kept as `handout.pdf` in the deck's results folder:
+written automatically when the deck's notes are complete (and refreshed after a Regenerate), if Chromium for
+Playwright is installed (see Setup).
 
-### Removing a lecture
+### Removing a deck
 
-**Delete** in the library moves the lecture folder to `lectures/.deleted/` (recoverable). Deleting or moving the folder
-yourself works too.
+**Delete** in the library moves the PDF and its results to `lectures/.deleted/` (recoverable). Deleting the PDF
+yourself removes the deck from the library but keeps its results.
 
-## What's in a lecture folder
+## What's in a results folder
 
 ```
-lectures/<Subject>/<Lecture>/
-  <deck>.pdf            your slides
-  context/*.pdf         your extra material
+lectures/<Subject>/Results/Lectures/<deck>/        (or Results/Recitations/<deck>/)
   notes/NNN.md          generated notes: plain Markdown, edit them freely
-  handout.pdf           written by "Download PDF"
+  handout.pdf           all slides + notes, one A4 page per slide
+  context/*.pdf         extra material for this deck (optional)
   .tutor/               app state (deleting it resets chats and usage stats; slides are re-rendered, notes kept)
     meta.json  text.json  usage.json
     slides/NNN.png  slides/NNN_sm.png      rendered slides and thumbnails
@@ -126,8 +135,8 @@ lectures/<Subject>/<Lecture>/
     logs/requests.jsonl                    what was sent with each request (see below)
 ```
 
-You can rename lecture and subject folders, or move a lecture to another subject, at any time. The lecture keeps
-its id, so links and the remembered slide survive, and its title follows the folder name.
+**Renaming** a PDF is fine: its results folder is renamed to match and nothing is regenerated (the app recognises
+the file by its content). Renaming a subject folder is fine too. A deck's title is its PDF name.
 
 ## Customising
 
@@ -182,7 +191,7 @@ When the plan limit is reached, the lecture shows **Paused** with the reset time
 
 Code: `app.py` (FastAPI routes, streaming chat, PDF export) · `jobs.py` (notes job, folder watcher) · `llm.py`
 (Claude Code / Agent SDK wrapper, retries, limits) · `prompts.py` · `pdfproc.py` (PyMuPDF rendering, text, OCR) ·
-`storage.py` (lecture folders) · `static/` (plain HTML/CSS/JS; marked, KaTeX, highlight.js and DOMPurify are
+`storage.py` (subject folders, deck index) · `static/` (plain HTML/CSS/JS; marked, KaTeX, highlight.js and DOMPurify are
 vendored so it works offline) · HTTP API in `docs/API.md`.
 
 ## Tests
@@ -193,14 +202,14 @@ uv run python tests/frontend/check_render.py          # Markdown/KaTeX rendering
 uv run python tests/screenshots.py <lecture-id>       # screenshots of library, reader and print view
 ```
 
-To try the app without a real lecture, copy the test deck into a folder: `mkdir -p "lectures/Demo/Test" && cp
-tests/fixtures/test_lecture.pdf lectures/Demo/Test/`.
+To try the app without a real lecture, copy the test deck into a subject: `mkdir -p lectures/Demo/Lectures && cp
+tests/fixtures/test_lecture.pdf lectures/Demo/Lectures/`.
 
 ## Troubleshooting
 
 - *"Claude Code CLI not found"* or authentication errors: run `claude`, log in, and check `claude auth status`.
-- *A new lecture doesn't show up*: the PDF must be directly inside `lectures/<Subject>/<Lecture>/`, and is picked
-  up a few seconds after it has finished copying. Folder names starting with `.` or `_` are ignored.
+- *A new PDF doesn't show up*: it must be directly inside `lectures/<Subject>/Lectures/` or `…/Recitations/`, and
+  is picked up a few seconds after it has finished copying. Folder names starting with `.` or `_` are ignored.
 - *A slide's notes failed*: the error is shown on that slide. Press **Prepare lecture** to retry failed slides, or
   **Regenerate** for one slide.
 - *Paused*: your plan's usage window is used up, and the job resumes after the reset time shown.

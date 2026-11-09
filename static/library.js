@@ -32,9 +32,9 @@
     var box = document.getElementById('loose-warning');
     if (!list.length) { box.hidden = true; return; }
     box.replaceChildren(
-      el('div', { text: 'These PDFs are ignored because they are not inside a lecture folder:' }),
+      el('div', { text: 'These PDFs are ignored because they are not inside a subject\'s Lectures/ or Recitations/ folder:' }),
       el('ul', {}, list.map(function (p) { return el('li', {}, el('code', { text: p })); })),
-      el('div', { text: 'Each lecture needs its own folder inside a subject folder, e.g. ' }, el('code', { text: '<Subject>/<Lecture>/slides.pdf' }), '.')
+      el('div', { text: 'Put slides into ' }, el('code', { text: '<Subject>/Lectures/' }), ' or ', el('code', { text: '<Subject>/Recitations/' }), '.')
     );
     box.hidden = false;
   }
@@ -129,11 +129,12 @@
 
     var metaBits = [];
     metaBits.push((l.n_slides || 0) + ' slide' + (l.n_slides === 1 ? '' : 's'));
-    if (l.folder) metaBits.push('📁 ' + l.folder.split('/').slice(-1)[0] + '/' + (l.filename || ''));
-    else if (l.filename) metaBits.push(l.filename);
+    var srcBit = l.filename ? { t: '📄 ' + l.filename, title: l.source || '' } : null;
     var ut = ST.usageText(l.usage);
-    if (ut) metaBits.push(ut);
-    r.meta.replaceChildren.apply(r.meta, metaBits.map(function (t) { return el('span', { text: t }); }));
+    var bits = [{ t: metaBits[0] }];
+    if (srcBit) bits.push(srcBit);
+    if (ut) bits.push({ t: ut });
+    r.meta.replaceChildren.apply(r.meta, bits.map(function (b) { return el('span', { text: b.t, title: b.title || '' }); }));
 
     var showBar = p.total > 0 || status === 'processing';
     r.bar.parentNode.hidden = !showBar;
@@ -202,30 +203,37 @@
     });
     Array.from(cards.keys()).forEach(function (id) { if (!seen.has(id)) { cards.get(id).root.remove(); cards.delete(id); } });
 
-    var groups = new Map(); // subject -> [lecture]
-    subjects.forEach(function (s) { groups.set(s.name, []); });
+    var groups = new Map(); // subject -> {lecture: [], recitation: []}
+    function grp(n) { if (!groups.has(n)) groups.set(n, { lecture: [], recitation: [] }); return groups.get(n); }
+    subjects.forEach(function (s) { grp(s.name); });
     lectures.forEach(function (l) {
-      var name = l.subject || '(no subject)';
-      if (!groups.has(name)) groups.set(name, []);
-      groups.get(name).push(l);
+      grp(l.subject || '(no subject)')[l.kind === 'recitation' ? 'recitation' : 'lecture'].push(l);
     });
+    function sortL(ls) {
+      return ls.sort(function (a, b) {
+        return natCmp(a.title || a.filename || a.id, b.title || b.filename || b.id) || natCmp(a.id, b.id);
+      });
+    }
     var names = Array.from(groups.keys()).sort(natCmp);
     var layout = names.map(function (n) {
-      return n + ':' + groups.get(n).sort(function (a, b) {
-        return natCmp(a.title || a.filename || a.id, b.title || b.filename || b.id) || natCmp(a.id, b.id);
-      }).map(function (l) { return l.id; }).join(',');
+      var g = groups.get(n);
+      return n + ':' + sortL(g.lecture).map(function (l) { return l.id; }).join(',') +
+        '/' + sortL(g.recitation).map(function (l) { return l.id; }).join(',');
     }).join('|');
     if (layout === lastLayout) return;
     lastLayout = layout;
 
     if (!lectures.length && !subjects.length) { showEmpty(); return; }
     listEl.replaceChildren.apply(listEl, names.map(function (n) {
-      var ls = groups.get(n);
-      var body = ls.length
-        ? el('div', { class: 'lectures' }, ls.map(function (l) { return cards.get(l.id).root; }))
-        : el('div', { class: 'subject-empty', text: 'No lectures yet' });
-      return el('section', { class: 'subject-section', dataset: { subject: n } },
-        el('h2', { class: 'subject-title', text: n }), body);
+      var g = groups.get(n);
+      var kids = [el('h2', { class: 'subject-title', text: n })];
+      [['lecture', 'Lectures'], ['recitation', 'Recitations']].forEach(function (k) {
+        if (!g[k[0]].length) return;
+        kids.push(el('h3', { class: 'kind-title', text: k[1] }));
+        kids.push(el('div', { class: 'lectures' }, g[k[0]].map(function (l) { return cards.get(l.id).root; })));
+      });
+      if (kids.length === 1) kids.push(el('div', { class: 'subject-empty', text: 'No slides yet' }));
+      return el('section', { class: 'subject-section', dataset: { subject: n } }, kids);
     }));
   }
 
@@ -272,7 +280,9 @@
     var subject = document.getElementById('subject').value.trim();
     if (!subject) { msg.classList.add('err'); msg.textContent = 'Enter a subject.'; return; }
     var fd = new FormData();
+    var kind = (form.querySelector('input[name=kind]:checked') || {}).value || 'lecture';
     fd.append('subject', subject);
+    fd.append('kind', kind);
     fd.append('file', file);
     Array.prototype.forEach.call(document.getElementById('context').files, function (f) { fd.append('context', f); });
     fd.append('autostart', document.getElementById('autostart').checked ? 'true' : 'false');
@@ -281,9 +291,10 @@
     msg.textContent = 'Uploading…';
     try {
       await ST.api('/api/lectures', { method: 'POST', body: fd });
-      try { localStorage.setItem('st.lastSubject', subject); } catch (e2) {}
+      try { localStorage.setItem('st.lastSubject', subject); localStorage.setItem('st.lastKind', kind); } catch (e2) {}
       form.reset();
       document.getElementById('subject').value = subject;
+      var kr = form.querySelector('input[name=kind][value=' + kind + ']'); if (kr) kr.checked = true;
       document.getElementById('autostart').checked = true;
       msg.textContent = 'Uploaded.';
       lastList = [{ status: 'processing' }];
@@ -297,6 +308,11 @@
   });
 
   try { var ls = localStorage.getItem('st.lastSubject'); if (ls) document.getElementById('subject').value = ls; } catch (e) {}
+  try {
+    var lk = localStorage.getItem('st.lastKind');
+    var kr0 = lk && form.querySelector('input[name=kind][value=' + lk + ']');
+    if (kr0) kr0.checked = true;
+  } catch (e) {}
   loadStatus();
   load();
 })();

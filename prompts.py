@@ -25,7 +25,9 @@ def _static_context(lid: str, slides: list[dict]) -> str:
     if tutor:
         parts.append(f"<tutor_instructions>\n{tutor}\n</tutor_instructions>")
     outline = "\n".join(f"{s['n']}. {s['title']}" for s in slides)
-    parts.append(f'<lecture title="{meta["title"]}" slides="{len(slides)}">\n<outline>\n{outline}\n</outline>\n</lecture>')
+    kind = "recitation (exercise session) slides" if meta.get("kind") == "recitation" else "lecture slides"
+    parts.append(f'<lecture subject="{storage.subject_of(lid)}" title="{meta["title"]}" type="{kind}" '
+                 f'slides="{len(slides)}">\n<outline>\n{outline}\n</outline>\n</lecture>')
     ctx = storage.context_texts(lid)
     if ctx:
         files = "\n\n".join(f'<context_file name="{name}">\n{text}\n</context_file>' for name, text in ctx)

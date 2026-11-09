@@ -74,13 +74,13 @@ def usage(calls=12):
 
 def summary(lid: str) -> dict:
     if lid == LID:
-        return {"id": LID, "subject": "DPHPC", "title": "Lecture 07 caches", "filename": "lecture-07-caches.pdf", "created": "2026-11-09T12:00:00Z",
+        return {"id": LID, "subject": "DPHPC", "title": "Lecture 07 caches", "filename": "lecture-07-caches.pdf", "kind": "lecture", "source": "/home/me/lectures/DPHPC/Lectures/lecture-07-caches.pdf", "folder": "/home/me/lectures/DPHPC/Results/Lectures/lecture-07-caches", "created": "2026-11-09T12:00:00Z",
                 "n_slides": N, "status": "incomplete" if False else "ready",
                 "prep": {"done": N, "total": N, "running": False, "errors": {}, "generating": [], "message": None, "paused_until": None},
                 "context_files": [{"name": "prev-lecture.pdf", "chars": 41000}], "usage": usage()}
     done = min(N, prep_calls["n"] // 2)
     st = "preparing" if done < N else "ready"
-    return {"id": LID2, "subject": "Architecture", "title": "Lecture 08 virtual memory", "filename": "lecture-08-vm.pdf", "created": "2026-11-10T12:00:00Z",
+    return {"id": LID2, "subject": "Architecture", "title": "Lecture 08 virtual memory", "filename": "recitation-08-vm.pdf", "kind": "recitation", "source": "/home/me/lectures/Architecture/Recitations/recitation-08-vm.pdf", "folder": "/home/me/lectures/Architecture/Results/Recitations/recitation-08-vm", "created": "2026-11-10T12:00:00Z",
             "n_slides": N, "status": st,
             "prep": {"done": done, "total": N, "running": st == "preparing", "errors": {}, "generating": [done + 1] if st == "preparing" else [],
                      "message": "Usage limit reached — resumes 14:00" if st == "preparing" and done == 3 else None, "paused_until": None},
@@ -139,7 +139,7 @@ class H(BaseHTTPRequestHandler):
                                    "rate_limit": {"five_hour": {"utilization": 0.45, "resets_at": 1794224400, "status": "allowed"},
                                                   "seven_day": {"utilization": 0.5, "resets_at": 1794224400, "status": "allowed"}}})
         if path == "/api/subjects":
-            return self.send_json([{"name": "Analysis", "lectures": 0}, {"name": "Architecture", "lectures": 1}, {"name": "DPHPC", "lectures": 1}])
+            return self.send_json([{"name": "Analysis", "lecture": 0, "recitation": 0}, {"name": "Architecture", "lecture": 0, "recitation": 1}, {"name": "DPHPC", "lecture": 1, "recitation": 0}])
         if path == "/api/lectures":
             return self.send_json([summary(LID2), summary(LID)])
         m = re.fullmatch(r"/api/lectures/([^/]+)(/.*)?", path)

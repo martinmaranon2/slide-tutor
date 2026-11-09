@@ -29,6 +29,9 @@ _side_tasks: set[asyncio.Task] = set()
 _resume_timers: dict[str, asyncio.Task] = {}
 _generating: dict[str, set[int]] = {}
 _lecture_tasks: dict[str, set[asyncio.Task]] = {}   # side tasks per lecture (regenerate, chat answers, processing)
+_handout_timers: dict[str, asyncio.Task] = {}
+_handout_sem: asyncio.Semaphore | None = None
+on_ready = None   # async fn(lid) set by app: writes Results/.../handout.pdf once a deck's notes are complete
 
 
 def sem() -> asyncio.Semaphore:
@@ -148,7 +151,7 @@ def start(lid: str) -> bool:
 
 def cancel(lid: str) -> None:
     """Stop all work for a lecture (prep job, resume timer, regenerate, chat answers, processing)."""
-    for d in (_jobs, _resume_timers):
+    for d in (_jobs, _resume_timers, _handout_timers):
         t = d.pop(lid, None)
         if t:
             t.cancel()
@@ -249,6 +252,33 @@ def _finish_run(lid: str, total: int, cancelled: bool, limit: "llm.UsageLimitErr
         meta["status"] = "ready" if done else "incomplete"
         meta["prep"]["message"] = None if done else f"{total - meta['prep']['done']} slide(s) failed; click Prepare to retry."
         storage.save_meta(lid, meta)
+        if done:
+            schedule_handout(lid)
+
+
+def schedule_handout(lid: str, delay: float = 10.0) -> None:
+    """(Re)write the deck's handout.pdf once things have been quiet for `delay` seconds (debounced; one at a time)."""
+    global _handout_sem
+    if on_ready is None:
+        return
+    if _handout_sem is None:
+        _handout_sem = asyncio.Semaphore(1)
+    old = _handout_timers.pop(lid, None)
+    if old:
+        old.cancel()
+
+    async def later():
+        await asyncio.sleep(delay)
+        async with _handout_sem:
+            if storage.exists(lid) and storage.load_meta(lid)["status"] == "ready":
+                try:
+                    await on_ready(lid)
+                except Exception as e:
+                    log.warning("handout for %s failed: %s", lid, e)
+        if _handout_timers.get(lid) is asyncio.current_task():
+            _handout_timers.pop(lid, None)
+
+    _handout_timers[lid] = spawn(later(), lid)
 
 
 def _record_error(lid: str, n: int, msg: str) -> None:
@@ -306,6 +336,8 @@ def regenerate(lid: str, n: int) -> bool:
                     if timer:
                         timer.cancel()
                 storage.save_meta(lid, meta)
+                if meta["status"] == "ready":
+                    schedule_handout(lid)
 
     spawn(go(), lid)
     return True
@@ -361,5 +393,7 @@ def resume_all() -> None:
             start(lid)
         elif status == "paused":
             _schedule_resume(lid, meta["prep"].get("paused_until"))
+        elif status == "ready" and not storage.handout_path(lid).exists():
+            schedule_handout(lid)
         if meta["prep"].get("running") and status != "preparing":
             storage.update_prep(lid, running=False)

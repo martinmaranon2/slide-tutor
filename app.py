@@ -77,8 +77,9 @@ def summary(lid: str) -> dict:
     prep["running"] = jobs.is_running(lid)
     prep["generating"] = sorted(jobs.generating(lid))
     return {
-        "id": meta["id"], "title": meta["title"], "filename": meta.get("deck"), "created": meta["created"],
-        "subject": storage.subject_of(lid), "folder": str(storage.folder(lid)),
+        "id": meta["id"], "title": meta["title"], "filename": meta.get("source"), "created": meta["created"],
+        "subject": storage.subject_of(lid), "kind": meta.get("kind", "lecture"),
+        "folder": str(storage.folder(lid)), "source": str(storage.deck_path(lid)),
         "n_slides": meta.get("n_slides") or 0, "status": meta["status"], "prep": prep,
         "context_files": meta.get("context_files", []), "usage": storage.usage_summary(lid),
     }
@@ -183,20 +184,18 @@ async def list_subjects():
 
 @app.post("/api/lectures")
 async def upload(file: UploadFile = File(...), context: list[UploadFile] = File(default=[]),
-                 subject: str = Form(""), autostart: str = Form("true")):
+                 subject: str = Form(""), kind: str = Form("lecture"), autostart: str = Form("true")):
     try:
         storage.safe_dirname(subject)
     except ValueError:
-        raise HTTPException(400, "Choose a subject (the folder the lecture goes into).")
+        raise HTTPException(400, "Choose a subject (the folder the slides go into).")
+    if kind not in storage.KINDS:
+        raise HTTPException(400, f"kind must be one of {', '.join(storage.KINDS)}")
     data = await _read_pdf_upload(file)
     ctx = await _read_context_uploads(context)
-    filename = storage.safe_filename(file.filename or "lecture.pdf")
-    if not filename.lower().endswith(".pdf"):
-        filename += ".pdf"
-    d = storage.new_folder_for_upload(subject, filename)   # lectures/<subject>/<name>/ like a hand-made folder
-    storage.atomic_write_bytes(d / filename, data)
-    lid = storage.add_to_index(d)
-    storage.register(lid, filename, title=d.name, autostart=autostart.lower() not in ("false", "0", "no", "off"))
+    # saved to <Subject>/Lectures|Recitations/<file>.pdf, exactly like a PDF dropped in by hand
+    lid = storage.save_upload(subject, kind, file.filename or "slides.pdf", data,
+                              autostart=autostart.lower() not in ("false", "0", "no", "off"))
     for name, blob in ctx:
         _save_context(lid, name, blob)
     jobs.spawn(jobs.process_upload(lid), lid)
@@ -420,12 +419,8 @@ def _drop_unanswered(lid: str, n: int, user_msg: dict) -> None:
 
 # ---------------------------------------------------------------- server-side PDF
 
-@app.get("/api/lectures/{lid}/pdf")
-async def handout_pdf(lid: str):
-    _lecture(lid)
-    if not await playwright_available():
-        return JSONResponse({"error": "Playwright/Chromium not installed (uv run playwright install chromium)"},
-                            status_code=501)
+async def export_handout(lid: str) -> bytes:
+    """Render the print view to PDF with headless Chromium and save it as <deck folder>/handout.pdf."""
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
         browser = await p.chromium.launch()
@@ -436,7 +431,27 @@ async def handout_pdf(lid: str):
             pdf = await page.pdf(format="A4", print_background=True, prefer_css_page_size=True)
         finally:
             await browser.close()
-    storage.atomic_write_bytes(storage.handout_path(lid), pdf)   # also keep a copy in the lecture folder
+    if storage.exists(lid):
+        storage.atomic_write_bytes(storage.handout_path(lid), pdf)   # the "result" copy in Results/
+    return pdf
+
+
+async def _auto_handout(lid: str) -> None:
+    if await playwright_available():
+        await export_handout(lid)
+        log.info("wrote %s", storage.handout_path(lid))
+
+
+jobs.on_ready = _auto_handout
+
+
+@app.get("/api/lectures/{lid}/pdf")
+async def handout_pdf(lid: str):
+    _lecture(lid)
+    if not await playwright_available():
+        return JSONResponse({"error": "Playwright/Chromium not installed (uv run playwright install chromium)"},
+                            status_code=501)
+    pdf = await export_handout(lid)
     return Response(pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{lid}-handout.pdf"'})
 

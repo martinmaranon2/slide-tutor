@@ -81,6 +81,7 @@ button, .btn, input, textarea, select { font: inherit; color: inherit; }
 .topbar .brand { font-weight: 650; letter-spacing: -.01em; color: var(--ink); }
 .topbar .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .topbar .title .subject { font-weight: 400; font-size: .9em; color: var(--muted); }
+.topbar .title .kindname { font-weight: 400; font-size: .9em; color: var(--muted); }
 .topbar .title .sep { font-weight: 400; color: var(--muted); }
 .topbar .spacer { flex: 1; }
 .topbar .prep { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -125,6 +126,10 @@ button, .btn, input, textarea, select { font: inherit; color: inherit; }
 .field input[type="text"] { width: 100%; box-sizing: border-box; padding: 7px 9px; font: inherit; border: 1px solid #c9c9c2; border-radius: 6px; background: var(--surface); color: var(--ink); }
 .lib-wrap h2.subject-title { margin: 0 0 10px; font-size: 13px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); }
 .subject-section .lectures { margin-top: 0; }
+.kind-title { margin: 14px 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.kind-title:first-of-type { margin-top: 0; }
+.field .radio { display: inline-flex; gap: 6px; align-items: center; margin-right: 16px; font-size: 14px; }
+.field span.lbl { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
 .subject-empty { color: var(--muted); font-size: 13.5px; padding: 4px 2px; }
 .warn-box { background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn); border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-top: 10px; }
 .warn-box ul { margin: 4px 0; padding-left: 20px; }
