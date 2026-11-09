@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>renderMarkdown test</title>
+<link rel="stylesheet" href="../../static/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../../static/vendor/highlight/styles/github.min.css">
+<link rel="stylesheet" href="../../static/app.css">
+<style>body{max-width:760px;margin:24px auto;padding:0 16px;display:block;height:auto;overflow:auto}</style>
+<script src="../../static/vendor/katex/katex.min.js"></script>
+<script src="../../static/vendor/marked/marked.min.js"></script>
+<script src="../../static/vendor/dompurify/purify.min.js"></script>
+<script src="../../static/vendor/highlight/highlight.min.js"></script>
+<script src="../../static/common.js"></script>
+</head>
+<body>
+<div id="out"></div>
+<script type="text/plain" id="fixture">## Cache misses (slide 12)
+
+1. Inline with dollars: the miss rate is $m = 1 - h$ and the hit time is \(t_h\).
+2. Absolute value $|x|$ and norm $\|v\|_2$ with escaped bar, plus \(\alpha + \beta\).
+3. Costs $5 and $10 and a bonus of $20 in total (these must stay text).
+
+Display with dollars:
+
+$$E[X] = \sum_{i=1}^{n} x_i \, p(x_i)$$
+
+Display with brackets:
+
+\[ \int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2} \]
+
+Multi-line aligned display:
+
+$$
+\begin{aligned}
+\text{AMAT} &= t_{hit} + m \cdot t_{miss} \\
+            &= 1 + 0.05 \cdot 100 \\
+            &= 6 \text{ cycles}
+\end{aligned}
+$$
+
+Multi-line bracket display:
+
+\[
+\begin{pmatrix} a & b \\ c & d \end{pmatrix}
+\begin{pmatrix} x \\ y \end{pmatrix}
+\]
+
+| Quantity | Formula | Note |
+|---|---|---|
+| Magnitude | $|x|$ | contains pipes |
+| Conditional | $P(A \mid B)$ | uses \mid |
+| Price | costs $5 | dollar amount in a table |
+| Long | \(\sum_{i=1}^{n} \frac{x_i^2}{\sigma_i^2} + \cdots + \frac{y_j^2}{\tau_j^2} + \text{a very long trailing expression}\) | wide |
+
+> "The cache is a small, fast memory." (slide quote)
+
+Cache written as a dollar sign (architecture slides): the store goes to $\$$ (arrow "1: update"), then $\$$ → mem.
+
+| Policy | Write hit | Write miss |
+|---|---|---|
+| WB/WA | CPU → $\$$ "update" only | mem → $\$$ "1: load", then CPU → $\$$ |
+
+Steps:
+
+1. Compute the index bits $\log_2(S)$.
+2. Compute the tag.
+   - nested point with $x^2$
+
+Shell code:
+
+```bash
+echo "$HOME is home"; for f in $FILES; do cat "$f"; done
+```
+
+C code with a format string:
+
+```c
+printf("$%d and $%s\n", cost, name);
+```
+
+Inline code: `$HOME` and `printf("$%d")` should keep their dollars, while $y = 2x$ is math.
+
+(background) The tag is compared in parallel across the ways.
+
+⚠ check: the slide says $O(n)$ but the next line implies $O(n \log n)$.
+
+**Takeaway:** a hit costs $t_h$; a miss costs $t_h + t_m$, so keep $m$ small.
+</script>
+<script>
+const FIXTURE = document.getElementById('fixture').textContent;
+renderMarkdown(document.getElementById('out'), FIXTURE);
+document.body.dataset.done = '1';
+</script>
+</body>
+</html>

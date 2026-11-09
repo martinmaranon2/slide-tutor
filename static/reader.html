@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slide Tutor · Reader</title>
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="/static/vendor/highlight/styles/github.min.css">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="reader">
+<header class="topbar">
+  <a class="btn btn-ghost btn-sm" href="/">← Library</a>
+  <span id="title" class="title">Loading…</span>
+  <span id="prep" class="prep small" hidden>
+    <span class="progress" id="prep-bar"><i></i></span>
+    <span id="prep-count" class="small" style="font-variant-numeric:tabular-nums"></span>
+    <span id="prep-msg" class="small muted"></span>
+  </span>
+  <button id="prepare-btn" class="btn btn-sm" type="button" hidden>Prepare lecture</button>
+  <span class="spacer"></span>
+  <span id="usage" class="small muted"></span>
+  <a id="print-link" class="btn btn-sm" target="_blank" rel="noopener">Print</a>
+</header>
+
+<div class="reader-main">
+  <section class="left">
+    <div class="stage" id="stage">
+      <div class="slide-wrap" id="slide-wrap" hidden>
+        <img class="slide" id="slide-img" alt="" draggable="false">
+        <div class="sel-layer" id="sel-layer" title="Drag to ask about a region"></div>
+      </div>
+      <div class="stage-msg" id="stage-msg">Loading…</div>
+    </div>
+    <div class="stage-hint">Drag a rectangle on the slide to ask about that part</div>
+    <div class="navbar">
+      <button id="prev" class="btn" type="button" aria-label="Previous slide" title="Previous (←)">◀</button>
+      <label class="jump"><span class="sr" hidden>Slide</span>
+        <input id="jump" type="number" min="1" value="1" aria-label="Go to slide number">
+        <span>/ <span id="total">0</span></span></label>
+      <button id="next" class="btn" type="button" aria-label="Next slide" title="Next (→)">▶</button>
+    </div>
+    <div class="thumbs" id="thumbs" aria-label="Slide thumbnails"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-notes" aria-selected="true" data-tab="notes">Notes</button>
+      <button class="tab" role="tab" id="tab-ask" aria-selected="false" data-tab="ask">Ask</button>
+    </div>
+
+    <div class="pane" id="pane-notes" role="tabpanel">
+      <div class="notes-scroll" id="notes-scroll">
+        <div class="notes-head">
+          <h2 id="notes-title"></h2>
+          <button id="regen" class="btn btn-sm" type="button" hidden>Regenerate</button>
+        </div>
+        <div id="notes-body"></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-ask" role="tabpanel" hidden>
+      <div class="ask-head">
+        <span class="grow" id="ask-title">Slide 1 thread</span>
+        <button id="clear-thread" class="btn btn-sm btn-ghost" type="button">Clear thread</button>
+      </div>
+      <div class="messages" id="messages"></div>
+      <div class="composer">
+        <div class="quick">
+          <button class="btn btn-sm" type="button" id="q-simpler">Explain simpler</button>
+          <button class="btn btn-sm" type="button" id="q-exam">Exam question</button>
+          <button class="btn btn-sm" type="button" id="q-check">Check my answer</button>
+        </div>
+        <div class="chip-region" id="region-chip" hidden>
+          <canvas id="region-canvas" width="10" height="10"></canvas>
+          <span>Your next question is about the selected region.</span>
+          <button class="x" id="region-remove" type="button">✕ remove</button>
+        </div>
+        <div class="input-row">
+          <textarea id="q" rows="1" placeholder="Ask about this slide…" aria-label="Your question"></textarea>
+          <button id="send" class="btn btn-primary" type="button">Send</button>
+        </div>
+        <div class="kbd-hint">Enter sends · Shift+Enter new line · press / to jump here</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script src="/static/vendor/katex/katex.min.js"></script>
+<script src="/static/vendor/marked/marked.min.js"></script>
+<script src="/static/vendor/dompurify/purify.min.js"></script>
+<script src="/static/vendor/highlight/highlight.min.js"></script>
+<script src="/static/common.js"></script>
+<script src="/static/reader.js"></script>
+</body>
+</html>

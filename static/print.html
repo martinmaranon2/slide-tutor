@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slide Tutor · Print</title>
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="/static/vendor/highlight/styles/github.min.css">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/print.css">
+</head>
+<body class="print-view">
+<div class="print-toolbar" id="toolbar">
+  <a class="btn btn-ghost btn-sm" id="back-link" href="/">← Back</a>
+  <span class="title" id="tb-title">Handout</span>
+  <span class="spacer" style="flex:1"></span>
+  <span class="status" id="tb-status" role="status">Fitting pages…</span>
+  <button class="btn btn-primary btn-sm" id="print-btn" type="button">Print / Save as PDF</button>
+  <a class="btn btn-sm" id="pdf-link" hidden download>Download PDF</a>
+</div>
+<main id="pages"></main>
+
+<script src="/static/vendor/katex/katex.min.js"></script>
+<script src="/static/vendor/marked/marked.min.js"></script>
+<script src="/static/vendor/dompurify/purify.min.js"></script>
+<script src="/static/vendor/highlight/highlight.min.js"></script>
+<script src="/static/common.js"></script>
+<script src="/static/print.js"></script>
+</body>
+</html>

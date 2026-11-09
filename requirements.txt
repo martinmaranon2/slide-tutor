@@ -1,0 +1,9 @@
+# Python >= 3.12. Preferred: `uv run app.py` (uses pyproject.toml / uv.lock).
+claude-agent-sdk>=0.2.179
+fastapi>=0.162
+pymupdf>=2.1
+python-multipart>=0.0.33
+uvicorn[standard]>=0.54
+# Optional: server-side "Download PDF" button and the screenshot checks.
+# Uncomment, then run `playwright install chromium`.
+# playwright>=1.64

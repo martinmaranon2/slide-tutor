@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slide Tutor · Library</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">Slide Tutor</a>
+  <span class="spacer"></span>
+  <span id="plan-usage" class="plan-usage" hidden></span>
+</header>
+
+<main class="lib-wrap">
+  <section class="card upload">
+    <h2>Add a lecture</h2>
+    <form id="upload-form">
+      <div class="field">
+        <label class="lbl" for="file">Lecture slides (PDF)</label>
+        <input id="file" name="file" type="file" accept="application/pdf,.pdf" required>
+      </div>
+      <div class="field">
+        <label class="lbl" for="context">Context files (previous lecture, exercise sheet)</label>
+        <input id="context" name="context" type="file" accept="application/pdf,.pdf" multiple>
+        <div class="hint">Optional PDFs that help explain the slides.</div>
+      </div>
+      <div class="row">
+        <label><input id="autostart" type="checkbox" checked> Start preparing notes immediately</label>
+        <button id="upload-btn" class="btn btn-primary" type="submit">Upload</button>
+        <span id="form-msg" class="form-msg muted" role="status"></span>
+      </div>
+    </form>
+  </section>
+
+  <p class="hint folder-hint" id="folder-hint">Or make a folder per lecture in <code id="lectures-dir">lectures/</code>
+    and drop the slide PDF into it (extra material goes in its <code>context/</code> subfolder). New folders are
+    picked up automatically within a few seconds.</p>
+
+  <h2 style="margin-top:28px">Your lectures</h2>
+  <div id="lectures" class="lectures"><div class="empty">Loading…</div></div>
+</main>
+
+<script src="/static/common.js"></script>
+<script src="/static/library.js"></script>
+</body>
+</html>
