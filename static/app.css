@@ -140,7 +140,7 @@ button, .btn, input, textarea, select { font: inherit; color: inherit; }
 body.reader { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 .reader-main {
   flex: 1; min-height: 0; display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(420px, 40%, 680px);
+  grid-template-columns: minmax(0, 1fr) 9px var(--panel-w, clamp(420px, 40%, 680px));
   grid-template-rows: minmax(0, 1fr);
 }
 .left { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px 14px 8px; gap: 8px; }
@@ -190,6 +190,21 @@ body.reader { height: 100vh; height: 100dvh; display: flex; flex-direction: colu
 .thumb .dot { position: absolute; right: 3px; top: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--warn-line); display: none; }
 .thumb.nonotes .dot { display: block; }
 .thumb.errnotes .dot { display: block; background: var(--err); }
+
+/* draggable divider between slide and panel */
+.splitter { position: relative; cursor: col-resize; touch-action: none; outline: none; }
+.splitter::before {
+  content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 3px;
+  background: transparent; transition: background .15s;
+}
+.splitter::after {
+  content: ""; position: absolute; top: 50%; left: 50%; width: 4px; height: 40px;
+  transform: translate(-50%, -50%); border-radius: 2px; background: #d4d4cc; transition: background .15s;
+}
+.splitter:hover::before, .splitter:focus-visible::before, body.resizing .splitter::before { background: var(--accent); }
+.splitter:hover::after, .splitter:focus-visible::after, body.resizing .splitter::after { background: var(--accent); }
+body.resizing { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+body.resizing .left, body.resizing .panel { pointer-events: none; }
 
 .panel {
   display: flex; flex-direction: column; min-height: 0; min-width: 0;
@@ -317,6 +332,7 @@ body.print-view { background: #8b8d91; }
 @media (max-width: 900px) {
   body.reader { height: auto; overflow: auto; display: block; }
   .reader-main { display: block; }
+  .splitter { display: none; }
   .stage { height: 56vw; max-height: 60vh; flex: none; }
   .panel { border-left: none; border-top: 1px solid var(--line); height: 80vh; }
 }

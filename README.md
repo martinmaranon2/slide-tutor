@@ -92,6 +92,8 @@ Open a lecture from the library.
 
 - ←/→ (or the buttons) to move, the jump box for a slide number, the thumbnail strip at the bottom. The app
   remembers where you stopped in each lecture.
+- **Drag the divider** between the slide and the right-hand panel to make the panel wider (slide smaller) or
+  narrower. The width is remembered; double-click the divider to reset it.
 - **Notes** tab: the study notes for this slide, with math (KaTeX), code and tables rendered. **Regenerate** rewrites
   just this slide's notes.
 

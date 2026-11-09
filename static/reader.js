@@ -167,6 +167,61 @@
   if (window.ResizeObserver) new ResizeObserver(fitStage).observe(stage);
   window.addEventListener('resize', fitStage);
 
+  /* ---------- resizable notes/ask panel: drag the divider; double-click resets; ←/→ when focused ---------- */
+  (function () {
+    var main = document.querySelector('.reader-main');
+    var sp = $('splitter');
+    var KEY = 'st.panelWidth', MIN_PANEL = 300, MIN_SLIDE = 320;
+    var width = null, dragging = false;
+    try { width = parseInt(localStorage.getItem(KEY), 10) || null; } catch (e) { /* storage unavailable */ }
+
+    function clampW(w) {
+      var max = main.clientWidth - sp.offsetWidth - MIN_SLIDE;
+      return Math.round(Math.max(MIN_PANEL, Math.min(w, max)));
+    }
+    function apply() {
+      if (width == null) main.style.removeProperty('--panel-w');
+      else main.style.setProperty('--panel-w', clampW(width) + 'px');
+    }
+    function save() {
+      try { if (width == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, String(width)); } catch (e) { /* ignore */ }
+    }
+    function refitMath() {
+      requestAnimationFrame(function () { ST.fitDisplayMath($('pane-notes')); ST.fitDisplayMath($('pane-ask')); });
+    }
+    function end() {
+      if (!dragging) return;
+      dragging = false;
+      document.body.classList.remove('resizing');
+      save(); refitMath();
+    }
+    sp.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      dragging = true;
+      sp.setPointerCapture(e.pointerId);
+      document.body.classList.add('resizing');
+    });
+    sp.addEventListener('pointermove', function (e) {
+      if (!dragging) return;
+      width = clampW(main.getBoundingClientRect().right - e.clientX - sp.offsetWidth / 2);
+      apply();
+    });
+    sp.addEventListener('pointerup', end);
+    sp.addEventListener('pointercancel', end);
+    sp.addEventListener('lostpointercapture', end);
+    sp.addEventListener('dblclick', function () { width = null; apply(); save(); refitMath(); });
+    sp.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault(); e.stopPropagation();          // don't change slides while the divider has focus
+      var cur = document.querySelector('.panel').getBoundingClientRect().width;
+      width = clampW(cur + (e.key === 'ArrowLeft' ? 40 : -40));
+      apply(); save(); refitMath();
+    });
+    window.addEventListener('resize', function () { if (width != null) apply(); });
+    apply();
+  })();
+
   img.addEventListener('dragstart', function (e) { e.preventDefault(); });
   wrap.addEventListener('dragstart', function (e) { e.preventDefault(); });
 
