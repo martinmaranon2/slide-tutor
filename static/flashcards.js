@@ -1,4 +1,4 @@
-/* Flashcards page: question list with hidden answers, regenerate + polling. */
+/* Flashcards page: the cards as one plain text block ("Question >> Answer" per line), copy, regenerate + polling. */
 (function () {
   'use strict';
   var ST = window.ST, el = ST.el;
@@ -7,8 +7,7 @@
   var id = ST.lectureIdFromPath();
   var base = '/api/lectures/' + ST.enc(id || '');
   var data = null;        // last GET /flashcards response
-  var cardsSig = '';      // signature of the rendered cards (open state survives polls)
-  var items = [];         // [{root, btn, ans}]
+  var text = '';          // the cards as they are in flashcards.txt
   var pollTimer = null;
 
   /* ---------- header ---------- */
@@ -93,52 +92,25 @@
 
   function renderToolbar(f, n) {
     var act = actionFor(f, n);
-    var all = $('fc-toggle-all'), dl = $('fc-download'), btn = $('fc-action');
-    all.hidden = !n;
+    var copy = $('fc-copy'), dl = $('fc-download'), btn = $('fc-action');
+    copy.hidden = !n;
     dl.hidden = !n;
     dl.setAttribute('href', base + '/flashcards.txt');
     btn.hidden = !act;
     if (act) { btn.textContent = act.label; btn.dataset.confirm = act.confirm ? '1' : ''; }
-    $('fc-toolbar').hidden = all.hidden && dl.hidden && btn.hidden;
+    $('fc-toolbar').hidden = copy.hidden && dl.hidden && btn.hidden;
   }
 
-  /* ---------- cards ---------- */
-  function syncToggleAll() {
-    var open = items.length > 0 && items.every(function (it) { return !it.ans.hidden; });
-    var b = $('fc-toggle-all');
-    b.setAttribute('aria-pressed', String(open));
-    b.textContent = open ? 'Hide all answers' : 'Show all answers';
-  }
-  function setOpen(it, open) {
-    it.ans.hidden = !open;
-    it.btn.setAttribute('aria-expanded', String(open));
-    it.root.classList.toggle('open', open);
-    if (open) ST.fitDisplayMath(it.ans);
-  }
-
+  /* ---------- cards: plain text, exactly as in flashcards.txt ---------- */
   function renderCards(cards) {
-    var sig = JSON.stringify(cards);
-    if (sig === cardsSig) return;
-    cardsSig = sig;
-    items = cards.map(function (c, i) {
-      var q = el('div', { class: 'fc-qtext' });
-      var a = el('div', { class: 'fc-a' });
-      ST.renderMarkdown(q, c.q);
-      ST.renderMarkdown(a, c.a);
-      var ansId = 'fc-a-' + (i + 1);
-      var btn = el('button', { class: 'fc-q', type: 'button', 'aria-expanded': 'false', 'aria-controls': ansId },
-        el('span', { class: 'fc-num', text: String(i + 1) }), q,
-        el('span', { class: 'fc-hint', 'aria-hidden': 'true', text: 'Show answer' }));
-      var ans = el('div', { class: 'fc-answer', id: ansId, hidden: true },
-        el('span', { class: 'fc-alabel', text: 'Answer' }), a);
-      var root = el('li', { class: 'fc-card' }, btn, ans);
-      var it = { root: root, btn: btn, ans: ans };
-      btn.addEventListener('click', function () { setOpen(it, ans.hidden); syncToggleAll(); });
-      return it;
-    });
-    var list = $('fc-list');
-    list.replaceChildren.apply(list, items.map(function (it) { return it.root; }));
-    syncToggleAll();
+    var t = cards.map(function (c) { return c.q + ' >> ' + c.a; }).join('\n');
+    if (t === text) return;
+    text = t;
+    var box = $('fc-text');
+    box.replaceChildren.apply(box, cards.map(function (c, i) {
+      return el('div', { class: 'fc-line' }, c.q + ' >> ' + c.a);
+    }));
+    box.hidden = !cards.length;
   }
 
   /* ---------- page state ---------- */
@@ -192,10 +164,19 @@
   }
 
   /* ---------- events ---------- */
-  $('fc-toggle-all').addEventListener('click', function () {
-    var open = !items.every(function (it) { return !it.ans.hidden; });
-    items.forEach(function (it) { setOpen(it, open); });
-    syncToggleAll();
+  var copiedTimer = null;
+  $('fc-copy').addEventListener('click', async function () {
+    var out = $('fc-copied');
+    try {
+      await navigator.clipboard.writeText(text + '\n');
+      out.textContent = 'Copied ' + text.split('\n').length + ' cards';
+    } catch (e) {   // no clipboard access: select the block so ⌘C works
+      var r = document.createRange(); r.selectNodeContents($('fc-text'));
+      var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      out.textContent = 'Selected: press ⌘C to copy';
+    }
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(function () { out.textContent = ''; }, 2500);
   });
 
   $('fc-action').addEventListener('click', async function () {

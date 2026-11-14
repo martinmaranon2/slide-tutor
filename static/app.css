@@ -617,38 +617,16 @@ body.fc-page { min-height: 100vh; }
 .fc-toolbar .grow { flex: 1; }
 .fc-msg { color: var(--muted); padding: 18px 0; font-family: var(--serif); font-size: 17px; }
 .fc-msg.err { color: var(--err); }
-.fc-list { list-style: none; margin: 0; padding: 0; }
-.fc-card { border-bottom: 1px solid var(--line-2); }
-.fc-card:last-child { border-bottom: none; }
-.fc-q {
-  appearance: none; display: grid; grid-template-columns: 2.2em minmax(0, 1fr) auto; gap: 0 4px; align-items: baseline;
-  width: 100%; margin: 0; padding: 16px 6px 16px 0; border: none; border-radius: 3px; background: none;
-  text-align: left; cursor: pointer; color: var(--ink);
+.fc-copied { font-size: 13px; color: var(--ok); }
+/* the cards as plain text: one card per line, wrapped lines indented so each card's start is visible */
+.fc-text {
+  padding: 12px 0 0; font-size: 15px; line-height: 1.55; color: var(--ink); overflow-wrap: anywhere; user-select: text;
 }
-.fc-q:hover { background: #f7f8f8; }
-.fc-num { font-size: 12.5px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; padding-left: 6px; }
-.fc-qtext { font-family: var(--serif); font-size: 17px; line-height: 1.5; min-width: 0; }
-.fc-qtext.md { font-size: 17px; line-height: 1.5; }
-.fc-qtext p, .fc-a p { margin: 0 0 .5em; }
-.fc-qtext > :last-child, .fc-a > :last-child { margin-bottom: 0; }
-.fc-hint { font-size: 12.5px; color: var(--petrol-ink); white-space: nowrap; padding-left: 10px; }
-.fc-card.open .fc-hint { visibility: hidden; }
-.fc-answer {
-  margin: -4px 0 16px 2.2em; padding: 10px 14px; border-left: 3px solid var(--petrol); background: var(--petrol-wash);
-  border-radius: 0 4px 4px 0; min-width: 0;
-}
-.fc-alabel { display: block; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--petrol-ink); margin-bottom: 3px; }
-.fc-a { font-family: var(--serif); font-size: 16px; line-height: 1.55; }
-.fc-a.md { font-size: 16px; line-height: 1.55; }
-.fc-q .katex-display, .fc-answer .katex-display { margin: .5em 0; overflow-x: auto; overflow-y: hidden; }
-
+.fc-line { padding: 3px 0 3px 1.4em; text-indent: -1.4em; white-space: pre-wrap; }
 @media (max-width: 900px) {
   .fc-wrap { padding: 16px 12px 48px; }
   .fc-sheet { padding: 22px 16px 26px; }
   .fc-heading { font-size: 25px; }
-  .fc-q { grid-template-columns: 1.8em minmax(0, 1fr); }
-  .fc-hint { grid-column: 2; padding: 4px 0 0; }
-  .fc-answer { margin-left: 1.8em; }
   .topbar .crumbs { flex: 1 1 100%; order: 3; white-space: normal; }
 }
 

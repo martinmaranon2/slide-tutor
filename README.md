@@ -108,45 +108,9 @@ The **Ask** tab is a separate thread per slide.
 - `/` focuses the input. Enter sends; Shift+Enter adds a new line.
 - **Drag a rectangle** on the slide to attach that region, re-rendered sharply from the PDF, to your next question
   ("what does this arrow mean?").
-- Quick buttons:
-  - *Explain simpler*
-  - *Exam question*: one exam-level question, without the solution.
-  - *Check my answer*: grades what you wrote, then gives a model answer.
-
-### 4. Print
-
-**Print** opens a handout with one A4 page per slide: the slide on top (110 mm wide), notes below. The font shrinks
-per page until the notes fit, down to 8 pt; longer notes continue on a second page rather than being cut. Use
-*Print → Save as PDF*, or **Download PDF**. The same handout is kept as `handout.pdf` in the deck's results folder:
-written automatically when the deck's notes are complete (and refreshed after a Regenerate), if Chromium for
-Playwright is installed (see Setup).
-
-### Removing a deck
-
-**Delete** in the library moves the PDF and its results to `lectures/.deleted/` (recoverable). Deleting the PDF
-yourself removes the deck from the library but keeps its results.
-
-## Flashcards and per-subject instructions
-
-A subject folder can hold two optional prompt files of your own, next to `Lectures/` and `Recitations/`:
-
-```
-lectures/Image Analysis & Computer Vision/
-  tutor_instructions.md      your tutor prompt for this subject: used for its notes, chat and flashcards
-  flashcards.md              your flashcard instructions: turns flashcards on for this subject
-  Exams/                     past exams and their solutions (PDF); any subfolder with "exam" in its name
-                             works, e.g. Past Exams/ (Exams/ is created if there is none)
-```
-
-With `flashcards.md` in place, every lecture of the subject gets **50 exam-style flashcards** in
-`Results/Lectures/<deck>/flashcards.txt`, one card per line as `Question >> Answer`, ready to import into a
-flashcard app. They are written automatically once all of the lecture's notes are done **and** `Exams/` contains at
-least one PDF. The model gets your flashcard instructions, your tutor instructions, the text of the past exams (scans
-are OCR'd if Tesseract is installed) and the lecture's slide text with its notes, so the cards follow what the
-exams actually test.
-
-- In the library, each deck shows its flashcard status. **Flashcards** opens them (click a card to reveal the
-  answer, or download the `.txt`). Recitations, and lectures before any exam is added, get theirs from the button.
+- In the library, each deck shows its flashcard status. **Flashcards** opens them as one plain text block, one
+  `Question >> Answer` per line, with **Copy all** and **Download .txt**. Recitations, and lectures before any exam
+  is added, get theirs from the button.
 - Finished cards are never redone automatically. After adding exams or changing `flashcards.md`, press
   **Regenerate flashcards**.
 - It is one request per deck, at most one deck at a time. `FLASHCARDS_COUNT`, `FLASHCARDS_MODEL` and
