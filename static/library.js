@@ -194,6 +194,44 @@
 
   function natCmp(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }); }
 
+  /* ---------- subject filter: '' = all subjects; kept in the URL (#subject=…) and localStorage ---------- */
+  var SUBJ_KEY = 'st.libSubject';
+  var tabsEl = document.getElementById('subject-tabs');
+  var current = readSelected();
+
+  function readSelected() {
+    var m = /^#subject=(.*)$/.exec(location.hash);
+    if (m) { try { return decodeURIComponent(m[1]); } catch (e) { /* bad hash */ } }
+    try { return localStorage.getItem(SUBJ_KEY) || ''; } catch (e) { return ''; }
+  }
+  function select(name) {
+    current = name;
+    try { localStorage.setItem(SUBJ_KEY, name); } catch (e) {}
+    history.replaceState(null, '', name ? '#subject=' + encodeURIComponent(name) : location.pathname + location.search);
+    if (name) document.getElementById('subject').value = name;
+    lastLayout = null;
+    render(lastList);
+  }
+  window.addEventListener('hashchange', function () { current = readSelected(); lastLayout = null; render(lastList); });
+
+  function renderTabs(names, groups) {
+    if (names.length < 2) { tabsEl.hidden = true; tabsEl.replaceChildren(); return; }
+    var total = 0;
+    function tab(value, label, count) {
+      return el('button', { type: 'button', class: 'subject-tab', 'aria-pressed': String(value === current),
+                            onclick: function () { select(value); } },
+        el('span', { text: label }), el('span', { class: 'n', text: String(count) }));
+    }
+    var tabs = names.map(function (n) {
+      var g = groups.get(n), c = g.lecture.length + g.recitation.length;
+      total += c;
+      return tab(n, n, c);
+    });
+    tabs.unshift(tab('', 'All subjects', total));
+    tabsEl.replaceChildren.apply(tabsEl, tabs);
+    tabsEl.hidden = false;
+  }
+
   function render(lectures) {
     var seen = new Set();
     lectures.forEach(function (l) {
@@ -215,7 +253,9 @@
       });
     }
     var names = Array.from(groups.keys()).sort(natCmp);
-    var layout = names.map(function (n) {
+    if (current && names.indexOf(current) < 0) current = '';   // subject folder gone or renamed
+    var shown = current ? [current] : names;
+    var layout = current + '#' + names.map(function (n) {
       var g = groups.get(n);
       return n + ':' + sortL(g.lecture).map(function (l) { return l.id; }).join(',') +
         '/' + sortL(g.recitation).map(function (l) { return l.id; }).join(',');
@@ -223,8 +263,9 @@
     if (layout === lastLayout) return;
     lastLayout = layout;
 
+    renderTabs(names, groups);
     if (!lectures.length && !subjects.length) { showEmpty(); return; }
-    listEl.replaceChildren.apply(listEl, names.map(function (n) {
+    listEl.replaceChildren.apply(listEl, shown.map(function (n) {
       var g = groups.get(n);
       var kids = [el('h2', { class: 'subject-title', text: n })];
       [['lecture', 'Lectures'], ['recitation', 'Recitations']].forEach(function (k) {
@@ -293,6 +334,7 @@
       await ST.api('/api/lectures', { method: 'POST', body: fd });
       try { localStorage.setItem('st.lastSubject', subject); localStorage.setItem('st.lastKind', kind); } catch (e2) {}
       form.reset();
+      if (current && current !== subject) select(subject);   // show the subject the deck went into
       document.getElementById('subject').value = subject;
       var kr = form.querySelector('input[name=kind][value=' + kind + ']'); if (kr) kr.checked = true;
       document.getElementById('autostart').checked = true;
@@ -307,7 +349,10 @@
     } finally { btn.disabled = false; }
   });
 
-  try { var ls = localStorage.getItem('st.lastSubject'); if (ls) document.getElementById('subject').value = ls; } catch (e) {}
+  try {
+    var ls = current || localStorage.getItem('st.lastSubject');
+    if (ls) document.getElementById('subject').value = ls;
+  } catch (e) {}
   try {
     var lk = localStorage.getItem('st.lastKind');
     var kr0 = lk && form.querySelector('input[name=kind][value=' + lk + ']');

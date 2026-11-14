@@ -48,7 +48,8 @@
     var kindName = l.kind === 'recitation' ? 'Recitations' : 'Lectures';
     t.textContent = '';
     if (l.subject) {
-      t.appendChild(el('span', { class: 'subject', text: l.subject }));
+      t.appendChild(el('a', { class: 'subject', href: '/#subject=' + encodeURIComponent(l.subject), text: l.subject,
+                              title: 'All ' + l.subject + ' slides' }));
       t.appendChild(el('span', { class: 'sep', text: ' › ' }));
       t.appendChild(el('span', { class: 'kindname', text: kindName }));
       t.appendChild(el('span', { class: 'sep', text: ' › ' }));
