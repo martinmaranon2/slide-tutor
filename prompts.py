@@ -152,7 +152,8 @@ FLASHCARD_RULES = """You write exam-preparation flashcards for one lecture of a 
 - the student's tutor instructions for the course (sources, notation, depth), if any;
 - past exams of the course, often with solutions: use them to judge which concepts get tested, how questions are \
 phrased and how hard they are. Write new cards in that style about THIS lecture's material; past-exam topics that \
-this lecture doesn't cover are not part of the deck;
+this lecture doesn't cover are not part of the deck. In solution files the correct multiple-choice options are \
+usually marked (e.g. √ instead of ⃝);
 - the lecture: every slide's extracted text plus study notes generated from the slide images (the notes describe \
 diagrams and work through the formulas; where notes and slide disagree, the slide wins).
 

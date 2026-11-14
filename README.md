@@ -85,7 +85,7 @@ The app renders the slides, extracts the text and starts writing notes. A progre
   regenerate afterwards.
 - To add context first and start later, run with `AUTO_PREPARE=0` (or untick *Start preparing notes immediately*
   when uploading), then press **Prepare lecture**.
-- PDFs anywhere else (directly in `lectures/`, in a subject folder, or another subfolder except `Exams/`) are
+- PDFs anywhere else (directly in `lectures/`, in a subject folder, or another subfolder except an exams folder) are
   ignored; the library lists them so you can move them.
 - The library has a tab per subject, so you only see that subject's decks; it remembers your last choice.
 
@@ -133,7 +133,8 @@ A subject folder can hold two optional prompt files of your own, next to `Lectur
 lectures/Image Analysis & Computer Vision/
   tutor_instructions.md      your tutor prompt for this subject: used for its notes, chat and flashcards
   flashcards.md              your flashcard instructions: turns flashcards on for this subject
-  Exams/                     past exams and their solutions (PDF), created once flashcards.md exists
+  Exams/                     past exams and their solutions (PDF); any subfolder with "exam" in its name
+                             works, e.g. Past Exams/ (Exams/ is created if there is none)
 ```
 
 With `flashcards.md` in place, every lecture of the subject gets **50 exam-style flashcards** in

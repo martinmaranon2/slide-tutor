@@ -4,7 +4,8 @@
       <Subject>/                      e.g. "DPHPC"; any name (Lectures/ and Recitations/ are created for you)
         Lectures/*.pdf                lecture slides: one PDF = one deck
         Recitations/*.pdf             recitation slides
-        Exams/*.pdf                   past exams (+ solutions), used for flashcards (created once flashcards.md exists)
+        Exams/*.pdf                   past exams (+ solutions) for flashcards; any subfolder with "exam" in its name
+                                      counts (e.g. "Past Exams"); Exams/ is created once flashcards.md exists
         tutor_instructions.md         optional: your tutor prompt for this subject (notes, chat, flashcards)
         flashcards.md                 optional: your flashcard instructions; turns flashcards on for this subject
         Results/                      written by the tool
@@ -167,12 +168,17 @@ def results_dir(subject: Path, kind: str) -> Path:
     return subject / RESULTS / KINDS[kind]
 
 
-def exams_dir(subject: Path) -> Path:
-    return subject / EXAMS
+def is_exam_dir(d: Path) -> bool:
+    """Past exams live in any subject subfolder with "exam" in its name: Exams/, Past Exams/, old exams/ …"""
+    return "exam" in d.name.lower() and d.is_dir() and not _hidden(d)
+
+
+def exam_dirs(subject: Path) -> list[Path]:
+    return sorted(d for d in subject.iterdir() if is_exam_dir(d)) if subject.is_dir() else []
 
 
 def exam_pdfs(subject: Path) -> list[Path]:
-    return _pdfs(exams_dir(subject))
+    return [p for d in exam_dirs(subject) for p in _pdfs(d)]
 
 
 def subject_prompt(subject: Path, name: str) -> str:
@@ -201,11 +207,11 @@ def subjects() -> list[dict]:
 def loose_pdfs() -> list[str]:
     """PDFs the app ignores: not inside a subject's Lectures/ or Recitations/ folder."""
     out = [p.name for p in _pdfs(LECTURES)]
-    allowed = {n.lower() for n in KINDS.values()} | {RESULTS.lower(), EXAMS.lower()}
+    allowed = {n.lower() for n in KINDS.values()} | {RESULTS.lower()}
     for subj in subject_dirs():
         out += [f"{subj.name}/{p.name}" for p in _pdfs(subj)]
         for d in sorted(subj.iterdir()):
-            if d.is_dir() and not _hidden(d) and d.name.lower() not in allowed:
+            if d.is_dir() and not _hidden(d) and d.name.lower() not in allowed and not is_exam_dir(d):
                 out += [f"{subj.name}/{d.name}/{p.name}" for p in _pdfs(d)]
     return out
 
@@ -243,8 +249,8 @@ def scan() -> list[str]:
         for kind in KINDS:
             src = source_dir(subj, kind)
             src.mkdir(exist_ok=True)                      # show the user where PDFs go
-            if flashcards_enabled(subj):
-                exams_dir(subj).mkdir(exist_ok=True)
+            if flashcards_enabled(subj) and not exam_dirs(subj):
+                (subj / EXAMS).mkdir(exist_ok=True)
             res = results_dir(subj, kind)
             known: dict[str, Path] = {}
             orphans: list[tuple[Path, dict]] = []         # results whose source PDF is gone (renamed/removed)

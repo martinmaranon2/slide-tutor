@@ -52,11 +52,11 @@ lecture can appear in `GET /api/lectures` without any upload call.
   "error": str | null,          // status "error"
   "resets_at": 1794224400 | null,  // status "paused" (plan usage limit), unix seconds; resumes automatically
   "exams": ["HS2023.pdf"],      // past exams the saved cards were made with
-  "exams_available": 3 }        // PDFs in <Subject>/Exams/ now
+  "exams_available": 3 }        // exam PDFs in the subject now (any subfolder with "exam" in its name)
 ```
 
 Flashcards status: `waiting_notes` = lecture notes not complete yet (made automatically afterwards);
-`waiting_exams` = notes done but `Exams/` is empty, so automatic generation waits (POST makes them anyway);
+`waiting_exams` = notes done but the subject has no exam PDFs (`Exams/`, `Past Exams/`, …), so automatic generation waits (POST makes them anyway);
 `idle` = recitation without cards (never automatic); `queued`/`generating` = in progress, poll; `ready` = cards exist;
 `paused` = plan limit; `error` = last attempt failed (not retried automatically).
 

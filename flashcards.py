@@ -4,6 +4,7 @@
       flashcards.md            your flashcard instructions (its presence turns flashcards on for the subject)
       tutor_instructions.md    optional: your tutor prompt for the subject (also used here)
       Exams/*.pdf              past exams and solutions: the model's reference for what is tested and how
+                               (any subfolder with "exam" in its name, e.g. "Past Exams/")
       Results/<Kind>/<deck>/flashcards.txt     one card per line: "Question >> Answer"
 
 Lectures get their cards automatically once all their notes exist and Exams/ holds at least one PDF; recitations,
