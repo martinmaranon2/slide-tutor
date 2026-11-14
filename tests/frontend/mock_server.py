@@ -12,7 +12,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import fitz  # pymupdf (project dependency)
 
@@ -42,6 +42,40 @@ poll_counts: dict[int, int] = {}
 chats: dict[int, list] = {}
 regen_state: dict[int, int] = {}
 prep_calls = {"n": 0}
+
+SAMPLE_CARDS = [
+    ("What does the gradient of an image $\\nabla I = (I_x, I_y)^T$ point towards?", "The direction of **steepest increase** of intensity; its magnitude is the edge strength."),
+    ("Define AMAT for a single-level cache.", "$\\text{AMAT} = t_h + m\\, t_m$, hit time plus miss rate times miss penalty."),
+    ("Which miss type disappears when you make a cache fully associative?", "**Conflict** misses (compulsory and capacity misses remain)."),
+    ("What does `write-allocate` do on a write miss?", "It loads the line into the cache first, then performs the write (typically paired with write-back)."),
+    ("State the work-span bound for greedy scheduling on $p$ processors.", "$T_p \\le T_1/p + T_\\infty$"),
+    ("Why is LRU rarely implemented exactly in hardware?", "Tracking exact recency costs $O(\\log_2(k!))$ bits per set; pseudo-LRU uses $k-1$ bits instead."),
+    ("A direct-mapped cache has 64 sets and 16 B lines. How many index bits?", "$\\log_2 64 = 6$ index bits (and 4 offset bits)."),
+    ("Name two ways to reduce the miss penalty.", "A multi-level cache hierarchy and critical-word-first / early restart."),
+]
+FC = {
+    LID: {"status": "ready", "count": len(SAMPLE_CARDS), "updated": "2026-11-12T09:30:00Z",
+          "exams": ["exam-2023.pdf", "exam-2024.pdf"], "exams_available": 2, "error": None, "resets_at": None},
+    LID2: {"status": "waiting_exams", "count": 0, "updated": None, "exams": [], "exams_available": 0,
+           "error": None, "resets_at": None},
+}
+fc_ticks: dict[str, int] = {}
+
+
+def fc_tick(lid: str) -> None:
+    """A fake generation finishes after a few polls."""
+    f = FC[lid]
+    if f["status"] in ("queued", "generating"):
+        n = fc_ticks[lid] = fc_ticks.get(lid, 0) + 1
+        f["status"] = "queued" if n < 2 else "generating" if n < 5 else "ready"
+        if f["status"] == "ready":
+            f.update(count=len(SAMPLE_CARDS), updated="2026-11-14T10:00:00Z", error=None,
+                     exams=["exam-2023.pdf"] if f["exams_available"] else [])
+
+
+def fc_summary(lid: str) -> dict:
+    f = FC[lid]
+    return {"enabled": f["status"] != "off", "target": 50, **f}
 
 
 def make_pdf() -> fitz.Document:
@@ -73,6 +107,12 @@ def usage(calls=12):
 
 
 def summary(lid: str) -> dict:
+    d = _summary(lid)
+    d["flashcards"] = fc_summary(lid)
+    return d
+
+
+def _summary(lid: str) -> dict:
     if lid == LID:
         return {"id": LID, "subject": "DPHPC", "title": "Lecture 07 caches", "filename": "lecture-07-caches.pdf", "kind": "lecture", "source": "/home/me/lectures/DPHPC/Lectures/lecture-07-caches.pdf", "folder": "/home/me/lectures/DPHPC/Results/Lectures/lecture-07-caches", "created": "2026-11-09T12:00:00Z",
                 "n_slides": N, "status": "incomplete" if False else "ready",
@@ -132,6 +172,21 @@ class H(BaseHTTPRequestHandler):
             return self.file(STATIC / "reader.html")
         if re.fullmatch(r"/lecture/[^/]+/print", path):
             return self.file(STATIC / "print.html")
+        if re.fullmatch(r"/lecture/[^/]+/flashcards", path):
+            return self.file(STATIC / "flashcards.html")
+        if path == "/mock/flashcards":  # test hook: /mock/flashcards?id=..&status=..&count=..&error=..&exams=..
+            q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+            f = FC[q.get("id", LID)]
+            f["status"] = q.get("status", f["status"])
+            if "count" in q:
+                f["count"] = int(q["count"])
+            if "error" in q:
+                f["error"] = q["error"]
+            if "exams_available" in q:
+                f["exams_available"] = int(q["exams_available"])
+            f["resets_at"] = int(q["resets_at"]) if "resets_at" in q else (int(time.time()) + 3 * 3600 if f["status"] == "paused" else None)
+            fc_ticks.pop(q.get("id", LID), None)
+            return self.send_json(fc_summary(q.get("id", LID)))
         if path.startswith("/static/"):
             return self.file(STATIC / path[len("/static/"):])
         if path == "/api/status":
@@ -141,6 +196,8 @@ class H(BaseHTTPRequestHandler):
         if path == "/api/subjects":
             return self.send_json([{"name": "Analysis", "lecture": 0, "recitation": 0}, {"name": "Architecture", "lecture": 0, "recitation": 1}, {"name": "DPHPC", "lecture": 1, "recitation": 0}])
         if path == "/api/lectures":
+            for k in FC:
+                fc_tick(k)
             return self.send_json([summary(LID2), summary(LID)])
         m = re.fullmatch(r"/api/lectures/([^/]+)(/.*)?", path)
         if m and m.group(1) in (LID, LID2):
@@ -150,6 +207,20 @@ class H(BaseHTTPRequestHandler):
                 done = d["prep"]["done"]
                 d["slides"] = [{"n": i + 1, "title": TITLES[i], "has_notes": (i + 1 <= done) if lid == LID2 else True} for i in range(N)]
                 return self.send_json(d)
+            if rest == "/flashcards":
+                fc_tick(lid)
+                d = summary(lid)
+                f = FC[lid]
+                cards = [{"q": q, "a": a} for q, a in SAMPLE_CARDS[:f["count"]]]
+                return self.send_json({"id": lid, "title": d["title"], "subject": d["subject"], "kind": d["kind"],
+                                       "flashcards": d["flashcards"], "cards": cards})
+            if rest == "/flashcards.txt":
+                f = FC[lid]
+                if not f["count"]:
+                    return self.send_json({"detail": "no flashcards"}, 404)
+                txt = "".join(f"{q} >> {a}\n" for q, a in SAMPLE_CARDS[:f["count"]]).encode()
+                return self.send_bytes(200, txt, "text/plain; charset=utf-8",
+                                       {"Content-Disposition": f'attachment; filename="{lid}-flashcards.txt"'})
             if rest == "/progress":
                 if lid == LID2:
                     prep_calls["n"] += 1
@@ -190,6 +261,14 @@ class H(BaseHTTPRequestHandler):
         mm = re.fullmatch(r"/api/lectures/([^/]+)/slides/(\d+)/ask", path)
         if mm:
             return self.ask(int(mm.group(2)), json.loads(body or b"{}"))
+        mm = re.fullmatch(r"/api/lectures/([^/]+)/flashcards", path)
+        if mm and mm.group(1) in FC:
+            lid = mm.group(1)
+            if FC[lid]["status"] in ("off", "queued", "generating"):
+                return self.send_json({"detail": f"flashcards are {FC[lid]['status']}"}, 409)
+            FC[lid].update(status="queued", error=None, resets_at=None)
+            fc_ticks[lid] = 0
+            return self.send_json(summary(lid))
         if path == "/api/lectures":
             if b'name="subject"' not in body:
                 return self.send_json({"detail": "subject is required"}, 400)

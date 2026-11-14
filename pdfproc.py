@@ -171,12 +171,19 @@ def render_region(lid: str, n: int, rect: list[float]) -> bytes:
         return _render(page, max(width, 1), clip=clip)
 
 
-def extract_pdf_text(pdf: Path) -> str:
-    """Plain text of a whole PDF with page markers (used for context files)."""
+def extract_pdf_text(pdf: Path, ocr: bool = False) -> str:
+    """Plain text of a whole PDF with page markers (context files, past exams). With ocr=True, pages without a
+    usable text layer (scans) are run through Tesseract when it is installed."""
     parts = []
     with pymupdf.open(pdf) as doc:
         for i, page in enumerate(doc):
             t = _compact(page.get_text("text", sort=True))
+            if ocr and len(t) < 40 and ocr_available():
+                try:
+                    tp = page.get_textpage_ocr(language="eng", dpi=200, full=True)
+                    t = _compact(page.get_text("text", textpage=tp, sort=True)) or t
+                except Exception:
+                    pass
             if t:
                 parts.append(f"[page {i + 1}]\n{t}")
     return "\n\n".join(parts)

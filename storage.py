@@ -4,10 +4,14 @@
       <Subject>/                      e.g. "DPHPC"; any name (Lectures/ and Recitations/ are created for you)
         Lectures/*.pdf                lecture slides: one PDF = one deck
         Recitations/*.pdf             recitation slides
+        Exams/*.pdf                   past exams (+ solutions), used for flashcards (created once flashcards.md exists)
+        tutor_instructions.md         optional: your tutor prompt for this subject (notes, chat, flashcards)
+        flashcards.md                 optional: your flashcard instructions; turns flashcards on for this subject
         Results/                      written by the tool
           Lectures/<pdf name>/        one per deck ("deck folder")
             notes/NNN.md              study notes (plain Markdown, editable)
             handout.pdf               printable notes, written when the notes are complete
+            flashcards.txt            exam flashcards, one per line "Question >> Answer" (subjects with flashcards.md)
             context/*.pdf             optional extra material for this deck
             .tutor/                   app state: meta.json, text.json, usage.json, slides/, chat/, logs/, context-text/
           Recitations/<pdf name>/
@@ -83,6 +87,10 @@ def safe_filename(name: str) -> str:
 
 KINDS = {"lecture": "Lectures", "recitation": "Recitations"}   # kind -> source/results subfolder name
 RESULTS = "Results"
+EXAMS = "Exams"
+SUBJECT_TUTOR = "tutor_instructions.md"
+SUBJECT_FLASHCARDS = "flashcards.md"
+FLASHCARDS = "flashcards.txt"
 
 _index: dict[str, Path] = {}      # deck id -> deck folder (<Subject>/Results/<Kind>/<name>)
 
@@ -159,6 +167,28 @@ def results_dir(subject: Path, kind: str) -> Path:
     return subject / RESULTS / KINDS[kind]
 
 
+def exams_dir(subject: Path) -> Path:
+    return subject / EXAMS
+
+
+def exam_pdfs(subject: Path) -> list[Path]:
+    return _pdfs(exams_dir(subject))
+
+
+def subject_prompt(subject: Path, name: str) -> str:
+    """A subject-level prompt file (tutor_instructions.md / flashcards.md) without HTML comments; "" if absent."""
+    p = subject / name
+    try:
+        text = p.read_text("utf-8")
+    except (FileNotFoundError, IsADirectoryError):
+        return ""
+    return re.sub(r"<!--.*?-->", "", text, flags=re.S).strip()
+
+
+def flashcards_enabled(subject: Path) -> bool:
+    return (subject / SUBJECT_FLASHCARDS).is_file()
+
+
 def subjects() -> list[dict]:
     """[{name, lecture: n, recitation: n}] for every subject folder, including empty ones."""
     counts: dict[tuple[Path, str], int] = {}
@@ -171,7 +201,7 @@ def subjects() -> list[dict]:
 def loose_pdfs() -> list[str]:
     """PDFs the app ignores: not inside a subject's Lectures/ or Recitations/ folder."""
     out = [p.name for p in _pdfs(LECTURES)]
-    allowed = {n.lower() for n in KINDS.values()} | {RESULTS.lower()}
+    allowed = {n.lower() for n in KINDS.values()} | {RESULTS.lower(), EXAMS.lower()}
     for subj in subject_dirs():
         out += [f"{subj.name}/{p.name}" for p in _pdfs(subj)]
         for d in sorted(subj.iterdir()):
@@ -213,6 +243,8 @@ def scan() -> list[str]:
         for kind in KINDS:
             src = source_dir(subj, kind)
             src.mkdir(exist_ok=True)                      # show the user where PDFs go
+            if flashcards_enabled(subj):
+                exams_dir(subj).mkdir(exist_ok=True)
             res = results_dir(subj, kind)
             known: dict[str, Path] = {}
             orphans: list[tuple[Path, dict]] = []         # results whose source PDF is gone (renamed/removed)
@@ -341,6 +373,10 @@ def context_text_path(lid: str, name: str) -> Path:
 
 def handout_path(lid: str) -> Path:
     return folder(lid) / HANDOUT
+
+
+def flashcards_path(lid: str) -> Path:
+    return folder(lid) / FLASHCARDS
 
 
 # ---------------------------------------------------------------- meta

@@ -8,6 +8,7 @@ Server: FastAPI on http://127.0.0.1:8000. All JSON. Slide numbers `n` are **1-ba
 | `GET /` | `static/index.html` — library (upload + list of lectures) |
 | `GET /lecture/{id}` | `static/reader.html` — reader (slide + Notes/Ask panel) |
 | `GET /lecture/{id}/print` | `static/print.html` — print/handout view |
+| `GET /lecture/{id}/flashcards` | `static/flashcards.html` — the deck's flashcards |
 | `GET /static/...` | everything under `static/` (CSS, JS, `vendor/`) |
 
 Pages get the lecture id from `location.pathname` (`/lecture/<id>` or `/lecture/<id>/print`).
@@ -40,8 +41,24 @@ lecture can appear in `GET /api/lectures` without any upload call.
   "created": "2026-11-09T12:00:00Z", "n_slides": 24,
   "status": "processing|ready_to_prepare|preparing|paused|ready|incomplete|error",
   "prep": Prep, "context_files": [ { "name": "prev-lecture.pdf", "chars": 41000 } ],
-  "usage": UsageTotals }
+  "usage": UsageTotals, "flashcards": Flashcards }
+
+// Flashcards (the deck's exam flashcards; see README "Flashcards")
+{ "enabled": true,              // the subject folder has flashcards.md; false -> status "off", show nothing
+  "status": "off|waiting_notes|waiting_exams|idle|queued|generating|ready|paused|error",
+  "count": 50,                  // cards in flashcards.txt now (an old file is kept if a regeneration fails)
+  "target": 50,                 // FLASHCARDS_COUNT
+  "updated": "2026-11-14T10:00:00Z" | null,
+  "error": str | null,          // status "error"
+  "resets_at": 1794224400 | null,  // status "paused" (plan usage limit), unix seconds; resumes automatically
+  "exams": ["HS2023.pdf"],      // past exams the saved cards were made with
+  "exams_available": 3 }        // PDFs in <Subject>/Exams/ now
 ```
+
+Flashcards status: `waiting_notes` = lecture notes not complete yet (made automatically afterwards);
+`waiting_exams` = notes done but `Exams/` is empty, so automatic generation waits (POST makes them anyway);
+`idle` = recitation without cards (never automatic); `queued`/`generating` = in progress, poll; `ready` = cards exist;
+`paused` = plan limit; `error` = last attempt failed (not retried automatically).
 
 Status meanings: `processing` = PDF being rendered; `ready_to_prepare` = rendered, notes not started;
 `preparing` = notes job running; `paused` = plan usage limit hit (see `prep.message`, `prep.paused_until`; auto-resumes);
@@ -70,6 +87,9 @@ Status meanings: `processing` = PDF being rendered; `ready_to_prepare` = rendere
 | `DELETE /api/lectures/{id}/slides/{n}/chat` | – | `{"ok": true}` (clears that slide's thread) |
 | `POST /api/lectures/{id}/slides/{n}/ask` | JSON `{ "question": str, "region": [x0,y0,x1,y1] \| null }` | `text/event-stream` (see below) |
 | `GET /api/lectures/{id}/chat-images/{file}` | – | PNG (region crops referenced from chat messages) |
+| `GET /api/lectures/{id}/flashcards` | – | `{ "id", "title", "subject", "kind", "flashcards": Flashcards, "cards": [{"q": str, "a": str}] }` |
+| `POST /api/lectures/{id}/flashcards` | – | `LectureSummary`; (re)writes the cards now. 409 if the subject has no `flashcards.md`, the deck isn't processed, or cards are already being written |
+| `GET /api/lectures/{id}/flashcards.txt` | – | the cards file as a `text/plain` download, one `Question >> Answer` per line; 404 if none |
 | `GET /api/lectures/{id}/pdf` | – | `application/pdf` attachment (server-side Playwright render of the print view). 501 if Playwright/Chromium unavailable |
 
 ```jsonc

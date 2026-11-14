@@ -22,6 +22,8 @@ No API key, no per-token billing; usage counts against your plan's limits.
 - **It's careful about your plan.** Prompts are built so the per-lecture part is cached, notes run 4 at a time,
   and if your plan's usage limit is hit the job pauses and resumes by itself when the window resets. The header
   shows your 5-hour and 7-day utilisation.
+- **Exam flashcards, per subject.** Add your own flashcard instructions and past exams to a subject, and every
+  lecture gets 50 `Question >> Answer` cards written in the style of those exams (see [Flashcards](#flashcards-and-per-subject-instructions)).
 - **Nothing leaves your machine except the model calls.** Lectures, notes and chats are files on disk;
   `lectures/` is git-ignored.
 
@@ -83,8 +85,9 @@ The app renders the slides, extracts the text and starts writing notes. A progre
   regenerate afterwards.
 - To add context first and start later, run with `AUTO_PREPARE=0` (or untick *Start preparing notes immediately*
   when uploading), then press **Prepare lecture**.
-- PDFs anywhere else (directly in `lectures/`, in a subject folder, or another subfolder) are ignored; the library
-  lists them so you can move them.
+- PDFs anywhere else (directly in `lectures/`, in a subject folder, or another subfolder except `Exams/`) are
+  ignored; the library lists them so you can move them.
+- The library has a tab per subject, so you only see that subject's decks; it remembers your last choice.
 
 ### 2. Read
 
@@ -122,12 +125,43 @@ Playwright is installed (see Setup).
 **Delete** in the library moves the PDF and its results to `lectures/.deleted/` (recoverable). Deleting the PDF
 yourself removes the deck from the library but keeps its results.
 
+## Flashcards and per-subject instructions
+
+A subject folder can hold two optional prompt files of your own, next to `Lectures/` and `Recitations/`:
+
+```
+lectures/Image Analysis & Computer Vision/
+  tutor_instructions.md      your tutor prompt for this subject: used for its notes, chat and flashcards
+  flashcards.md              your flashcard instructions: turns flashcards on for this subject
+  Exams/                     past exams and their solutions (PDF), created once flashcards.md exists
+```
+
+With `flashcards.md` in place, every lecture of the subject gets **50 exam-style flashcards** in
+`Results/Lectures/<deck>/flashcards.txt`, one card per line as `Question >> Answer`, ready to import into a
+flashcard app. They are written automatically once all of the lecture's notes are done **and** `Exams/` contains at
+least one PDF. The model gets your flashcard instructions, your tutor instructions, the text of the past exams (scans
+are OCR'd if Tesseract is installed) and the lecture's slide text with its notes, so the cards follow what the
+exams actually test.
+
+- In the library, each deck shows its flashcard status. **Flashcards** opens them (click a card to reveal the
+  answer, or download the `.txt`). Recitations, and lectures before any exam is added, get theirs from the button.
+- Finished cards are never redone automatically. After adding exams or changing `flashcards.md`, press
+  **Regenerate flashcards**.
+- It is one request per deck, at most one deck at a time. `FLASHCARDS_COUNT`, `FLASHCARDS_MODEL` and
+  `FLASHCARDS_EFFORT` (default 50, the notes model, `high`) change the defaults.
+
+`tutor_instructions.md` is added after the app-wide `prompts/tutor_instructions.md`. For the notes, the notes format
+(length, no headings) still wins where the two disagree, since the notes are printed one page per slide; in the chat,
+your instructions win. Both files are re-read on every request. `lectures/` is git-ignored, so your prompts and
+exams stay on your machine.
+
 ## What's in a results folder
 
 ```
 lectures/<Subject>/Results/Lectures/<deck>/        (or Results/Recitations/<deck>/)
   notes/NNN.md          generated notes: plain Markdown, edit them freely
   handout.pdf           all slides + notes, one A4 page per slide
+  flashcards.txt        exam flashcards, "Question >> Answer" per line (subjects with flashcards.md)
   context/*.pdf         extra material for this deck (optional)
   .tutor/               app state (deleting it resets chats and usage stats; slides are re-rendered, notes kept)
     meta.json  text.json  usage.json
@@ -145,7 +179,8 @@ the file by its content). Renaming a subject folder is fine too. A deck's title 
 | What | Where |
 |---|---|
 | Notes style (length, structure, "⚠ check:", "Takeaway:") | `prompts/notes_style.md` |
-| Your own instructions (course, exam format, language, …), used for notes **and** chat | `prompts/tutor_instructions.md` |
+| Your own instructions (course, exam format, language, …), used for notes **and** chat | `prompts/tutor_instructions.md` (all subjects), `lectures/<Subject>/tutor_instructions.md` (one subject) |
+| Flashcards for a subject | `lectures/<Subject>/flashcards.md` (see [Flashcards](#flashcards-and-per-subject-instructions)) |
 | Markdown/LaTeX output rules | `prompts/output_format.md` |
 | Chat behaviour | `CHAT_RULES` in `prompts.py` |
 
@@ -161,6 +196,7 @@ Environment variables (all optional):
 | `NOTES_MODEL` / `CHAT_MODEL` | `claude-sonnet-5-5` | model for notes / chat |
 | `NOTES_EFFORT` / `CHAT_EFFORT` | `medium` | `low` … `max`; higher means more thinking and more plan usage |
 | `CONCURRENCY` | `4` | parallel note generations, shared by all lectures |
+| `FLASHCARDS_COUNT` / `FLASHCARDS_MODEL` / `FLASHCARDS_EFFORT` | `50` / notes model / `high` | flashcards per deck, and the model for them |
 | `MAX_ATTEMPTS` | `5` | tries per slide on overload errors (backoff 2 s, 4 s, 8 s, …) |
 | `HOST` / `PORT` | `127.0.0.1` / `8000` | server address |
 
@@ -191,7 +227,8 @@ When the plan limit is reached, the lecture shows **Paused** with the reset time
   notes lengths, neighbouring slides, chat history length and whether a region was attached.
 - **Not available on a subscription:** the Message Batches API.
 
-Code: `app.py` (FastAPI routes, streaming chat, PDF export) · `jobs.py` (notes job, folder watcher) · `llm.py`
+Code: `app.py` (FastAPI routes, streaming chat, PDF export) · `jobs.py` (notes job, folder watcher) ·
+`flashcards.py` (flashcard job, past-exam text) · `llm.py`
 (Claude Code / Agent SDK wrapper, retries, limits) · `prompts.py` · `pdfproc.py` (PyMuPDF rendering, text, OCR) ·
 `storage.py` (subject folders, deck index) · `static/` (plain HTML/CSS/JS; marked, KaTeX, highlight.js and DOMPurify are
 vendored so it works offline) · HTTP API in `docs/API.md`.

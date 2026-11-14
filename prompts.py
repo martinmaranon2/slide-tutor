@@ -18,12 +18,27 @@ def _read_prompt(name: str) -> str:
     return re.sub(r"<!--.*?-->", "", text, flags=re.S).strip()
 
 
-def _static_context(lid: str, slides: list[dict]) -> str:
+def tutor_instructions(subject) -> str:
+    """prompts/tutor_instructions.md (all subjects) followed by <Subject>/tutor_instructions.md, if present."""
+    return "\n\n".join(x for x in [_read_prompt("tutor_instructions.md"),
+                                    storage.subject_prompt(subject, storage.SUBJECT_TUTOR)] if x)
+
+
+_PRECEDENCE = {
+    "notes": "Follow them for sources, notation, depth and explanation style. Where they ask for a different answer "
+             "structure or length, the study-notes format above takes precedence (the notes are printed one page "
+             "per slide).",
+    "chat": "Follow them; they take precedence over the general answer-length guideline above.",
+}
+
+
+def _static_context(lid: str, slides: list[dict], task: str) -> str:
     meta = storage.load_meta(lid)
     parts = []
-    tutor = _read_prompt("tutor_instructions.md")
+    tutor = tutor_instructions(storage.subject_dir(lid))
     if tutor:
-        parts.append(f"<tutor_instructions>\n{tutor}\n</tutor_instructions>")
+        parts.append(f"<tutor_instructions>\nThe student's own instructions for this course. {_PRECEDENCE[task]}\n\n"
+                     f"{tutor}\n</tutor_instructions>")
     outline = "\n".join(f"{s['n']}. {s['title']}" for s in slides)
     kind = "recitation (exercise session) slides" if meta.get("kind") == "recitation" else "lecture slides"
     parts.append(f'<lecture subject="{storage.subject_of(lid)}" title="{meta["title"]}" type="{kind}" '
@@ -41,7 +56,7 @@ def notes_system(lid: str, slides: list[dict]) -> str:
     return "\n\n".join([
         _read_prompt("notes_style.md"),
         _read_prompt("output_format.md"),
-        _static_context(lid, slides),
+        _static_context(lid, slides, "notes"),
     ])
 
 
@@ -61,7 +76,7 @@ model answer."""
 
 
 def chat_system(lid: str, slides: list[dict]) -> str:
-    return "\n\n".join([CHAT_RULES, _read_prompt("output_format.md"), _static_context(lid, slides)])
+    return "\n\n".join([CHAT_RULES, _read_prompt("output_format.md"), _static_context(lid, slides, "chat")])
 
 
 def _src(s: dict) -> str:
@@ -127,4 +142,89 @@ def chat_request(lid: str, n: int, slides: list[dict], question: str, history: l
     info = {"slide_image": str(storage.slide_png(lid, n).relative_to(storage.lecture_dir(lid))),
             "slide_text_chars": len(s["text"]), "notes_chars": len(notes or ""), "notes_included": bool(notes),
             "neighbours": nums, "history_turns": len(history), "region": bool(region_png)}
+    return content, info
+
+
+# ---------------------------------------------------------------- flashcards
+
+FLASHCARD_RULES = """You write exam-preparation flashcards for one lecture of a university course. You get:
+- the student's flashcard instructions: follow them exactly, including the card format;
+- the student's tutor instructions for the course (sources, notation, depth), if any;
+- past exams of the course, often with solutions: use them to judge which concepts get tested, how questions are \
+phrased and how hard they are. Write new cards in that style about THIS lecture's material; past-exam topics that \
+this lecture doesn't cover are not part of the deck;
+- the lecture: every slide's extracted text plus study notes generated from the slide images (the notes describe \
+diagrams and work through the formulas; where notes and slide disagree, the slide wins).
+
+Output rules (the file is imported line by line):
+- One card per line: `Question >> Answer`. Nothing else: no numbering, bullets, headings, blank lines, preamble or \
+closing remarks.
+- `>>` appears exactly once per line, as the separator. Never use it inside a question or answer (write ≫ for \
+"much greater than").
+- A card never spans lines. Math as inline LaTeX in $...$ (no $$ display math), otherwise plain text.
+- Every question must make sense on its own, without the slides at hand: name the method, quantity or setting it \
+is about instead of saying "this slide" or "the figure"."""
+
+
+def flashcards_system(subject, exams: list[tuple[str, str]]) -> str:
+    """Identical for every deck of a subject (as long as the files don't change), so it is prompt-cached."""
+    parts = [FLASHCARD_RULES,
+             f"<flashcard_instructions>\n{storage.subject_prompt(subject, storage.SUBJECT_FLASHCARDS)}\n"
+             "</flashcard_instructions>"]
+    tutor = tutor_instructions(subject)
+    if tutor:
+        parts.append(f"<tutor_instructions>\n{tutor}\n</tutor_instructions>")
+    if exams:
+        body = "\n\n".join(f'<exam file="{name}">\n{text}\n</exam>' for name, text in exams)
+        parts.append(f"<past_exams>\n{body}\n</past_exams>")
+    else:
+        parts.append("<past_exams>\n(none provided: judge exam relevance from the slides' emphasis and learning "
+                     "objectives)\n</past_exams>")
+    return "\n\n".join(parts)
+
+
+def _trim_notes(notes: str, limit: int) -> str:
+    """Notes shortened to about `limit` chars: leading paragraphs plus the "Takeaway:" and "⚠ check:" paragraphs."""
+    if len(notes) <= limit:
+        return notes
+    paras = [p for p in re.split(r"\n\s*\n", notes.strip()) if p.strip()]
+    keep_always = [p for p in paras if re.match(r"\W*(Takeaway|⚠)", p.strip())]
+    out, used = [], sum(len(p) for p in keep_always)
+    for p in paras:
+        if p in keep_always:
+            continue
+        if used + len(p) > limit and out:
+            out.append("[…]")
+            break
+        out.append(p)
+        used += len(p)
+    return "\n\n".join(out + keep_always)
+
+
+LECTURE_CHARS = 220_000   # budget for slide text + notes in one flashcards request (~55k tokens)
+
+
+def flashcards_request(lid: str, slides: list[dict], count: int) -> tuple[list[dict], dict]:
+    meta = storage.load_meta(lid)
+    text_total = sum(len(s["text"] or "") for s in slides)
+    per_slide = max(800, (LECTURE_CHARS - text_total) // max(1, len(slides)))
+    blocks, notes_chars, trimmed = [], 0, 0
+    for s in slides:
+        notes = storage.read_notes(lid, s["n"]) or ""
+        # slides that are mostly a picture get more of their notes: the notes are the only description of it
+        limit = per_slide * (2 if len((s["text"] or "").strip()) < 150 else 1)
+        short = _trim_notes(notes.strip(), limit) if notes else ""
+        trimmed += short != notes.strip()
+        notes_chars += len(short)
+        blocks.append(f'<slide number="{s["n"]}" title="{s["title"]}"{_src(s)}>\n{s["text"] or "(no text layer)"}\n'
+                      + (f"<study_notes>\n{short}\n</study_notes>\n" if short else "") + "</slide>")
+    kind = "recitation (exercise session) slides" if meta.get("kind") == "recitation" else "lecture slides"
+    lecture = (f'<lecture subject="{storage.subject_of(lid)}" title="{meta["title"]}" type="{kind}" '
+               f'slides="{len(slides)}">\n' + "\n".join(blocks) + "\n</lecture>")
+    task = (f"Write {count} flashcards for this lecture now ({count} is the student's standard per lecture; if the "
+            "material clearly has fewer distinct exam-relevant ideas, write fewer rather than near-duplicates). Cover "
+            "the whole lecture, weighted by what the past exams test. Output only the cards, one per line.")
+    content = [text_block(lecture), text_block(task)]
+    info = {"slides": len(slides), "slide_text_chars": text_total, "notes_chars": notes_chars,
+            "notes_trimmed": trimmed, "notes_limit_per_slide": per_slide}
     return content, info

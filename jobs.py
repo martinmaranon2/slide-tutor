@@ -32,6 +32,7 @@ _lecture_tasks: dict[str, set[asyncio.Task]] = {}   # side tasks per lecture (re
 _handout_timers: dict[str, asyncio.Task] = {}
 _handout_sem: asyncio.Semaphore | None = None
 on_ready = None   # async fn(lid) set by app: writes Results/.../handout.pdf once a deck's notes are complete
+after_scan = None  # fn() set by app, run after every folder scan (starts due flashcard decks)
 
 
 def sem() -> asyncio.Semaphore:
@@ -121,6 +122,8 @@ async def scan_folders() -> None:
     for lid in storage.list_ids():
         if storage.load_meta(lid)["status"] != "processing":
             await sync_context(lid)
+    if after_scan:
+        after_scan()
 
 
 async def watch_folders(interval: float = 5.0) -> None:

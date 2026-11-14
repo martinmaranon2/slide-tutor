@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import flashcards
 import jobs
 import llm
 import pdfproc
@@ -43,6 +44,7 @@ STATIC = storage.ROOT / "static"
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    jobs.after_scan = flashcards.auto
     jobs.resume_all()
     watcher = asyncio.create_task(jobs.watch_folders())
     log.info("lecture folders: %s", storage.LECTURES)
@@ -82,6 +84,7 @@ def summary(lid: str) -> dict:
         "folder": str(storage.folder(lid)), "source": str(storage.deck_path(lid)),
         "n_slides": meta.get("n_slides") or 0, "status": meta["status"], "prep": prep,
         "context_files": meta.get("context_files", []), "usage": storage.usage_summary(lid),
+        "flashcards": flashcards.info(lid, meta),
     }
 
 
@@ -130,6 +133,12 @@ async def page_reader(lid: str):
 async def page_print(lid: str):
     _lecture(lid)
     return FileResponse(STATIC / "print.html")
+
+
+@app.get("/lecture/{lid}/flashcards")
+async def page_flashcards(lid: str):
+    _lecture(lid)
+    return FileResponse(STATIC / "flashcards.html")
 
 
 # ---------------------------------------------------------------- status
@@ -249,6 +258,40 @@ async def prepare(lid: str):
         return summary(lid)
     jobs.start(lid)
     return summary(lid)
+
+
+# ---------------------------------------------------------------- flashcards
+
+@app.get("/api/lectures/{lid}/flashcards")
+async def get_flashcards(lid: str):
+    meta = _lecture(lid)
+    return {"id": lid, "title": meta["title"], "subject": storage.subject_of(lid), "kind": meta.get("kind", "lecture"),
+            "flashcards": flashcards.info(lid, meta),
+            "cards": [{"q": q, "a": a} for q, a in flashcards.read_cards(lid)]}
+
+
+@app.post("/api/lectures/{lid}/flashcards")
+async def make_flashcards(lid: str):
+    meta = _lecture(lid)
+    if not storage.flashcards_enabled(storage.subject_dir(lid)):
+        raise HTTPException(409, f"Flashcards are off for this subject: add {storage.SUBJECT_FLASHCARDS} to "
+                                 f"the {storage.subject_of(lid)} folder")
+    if flashcards.running(lid):
+        raise HTTPException(409, "Flashcards are already being written")
+    if meta["status"] in ("processing", "error") or not meta.get("n_slides"):
+        raise HTTPException(409, "The slides haven't been processed yet")
+    flashcards.start(lid)
+    return summary(lid)
+
+
+@app.get("/api/lectures/{lid}/flashcards.txt")
+async def flashcards_file(lid: str):
+    meta = _lecture(lid)
+    p = storage.flashcards_path(lid)
+    if not p.exists():
+        raise HTTPException(404, "No flashcards yet")
+    return FileResponse(p, media_type="text/plain; charset=utf-8",
+                        filename=f"{storage.safe_filename(meta['title'])} flashcards.txt")
 
 
 @app.get("/api/lectures/{lid}/progress")

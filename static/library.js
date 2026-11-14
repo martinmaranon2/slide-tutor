@@ -61,12 +61,15 @@
     refs.ctxInput = el('input', { type: 'file', accept: 'application/pdf,.pdf', multiple: true, 'aria-label': 'Add context files' });
     refs.ctxMsg = el('span', { class: 'small err' });
 
+    refs.fc = el('div', { class: 'fc', hidden: true });
+
     var root = el('article', { class: 'card lecture', dataset: { id: l.id } },
       el('div', { class: 'head' }, refs.title, refs.badge),
       refs.meta,
       el('div', { class: 'progress-row' }, refs.bar, refs.count),
       refs.message,
       el('div', { class: 'actions' }, refs.open, refs.print, refs.prepare, el('span', { class: 'grow' }), refs.del),
+      refs.fc,
       el('div', { class: 'ctx' },
         el('div', { class: 'ctx-title', text: 'Context files' }),
         refs.ctxList,
@@ -118,6 +121,81 @@
     return root;
   }
 
+  /* ---------- flashcards line ---------- */
+  function fcBusy(l) {
+    var f = l && l.flashcards;
+    return !!(f && f.enabled && (f.status === 'queued' || f.status === 'generating'));
+  }
+  function fmtWhen(sec) {
+    var d = new Date(sec * 1000);
+    var t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === new Date().toDateString() ? t : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + t;
+  }
+  function fmtDay(iso) {
+    var d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  // Rebuilt only when the flashcards state changes, so polling never steals focus from its button.
+  function renderFlashcards(l, r) {
+    var f = l.flashcards;
+    if (!f || !f.enabled) { r.fc.hidden = true; r.fcSig = ''; return; }
+    var sig = JSON.stringify([l.id, l.subject, f.status, f.count, f.target, f.updated, f.error, f.resets_at]);
+    r.fc.hidden = false;
+    if (sig === r.fcSig) return;
+    r.fcSig = sig;
+
+    var st = f.status, count = f.count || 0;
+    var kids = [count > 0
+      ? el('a', { class: 'fc-title fc-link', href: '/lecture/' + ST.enc(l.id) + '/flashcards', text: 'Flashcards (' + count + ')' })
+      : el('span', { class: 'fc-title', text: 'Flashcards' })];
+    var state = el('span', { class: 'fc-state' });
+    var action = null;   // {label, regenerate}
+
+    if (st === 'waiting_notes') {
+      state.textContent = 'Made automatically once the notes are done.';
+    } else if (st === 'waiting_exams') {
+      state.append('Waiting for past exams. Put PDFs into ', el('code', { text: (l.subject || '<Subject>') + '/Exams/' }), ' and they are picked up.');
+      action = { label: 'Make without exams' };
+    } else if (st === 'idle') {
+      state.textContent = 'Not made automatically for this deck.';
+      action = { label: 'Make flashcards' };
+    } else if (st === 'queued' || st === 'generating') {
+      state.append(el('span', { class: 'spinner', 'aria-hidden': 'true' }),
+        st === 'queued' ? 'Queued…' : 'Writing flashcards… (1 to 3 minutes)');
+      if (count > 0) state.append(' The current cards stay available.');
+    } else if (st === 'ready') {
+      if (f.updated) state.textContent = 'Updated ' + fmtDay(f.updated);
+      action = { label: 'Regenerate flashcards', regenerate: true };
+    } else if (st === 'paused') {
+      state.textContent = 'Paused by the plan usage limit' + (f.resets_at ? '; resumes about ' + fmtWhen(f.resets_at) : '') + '.';
+    } else if (st === 'error') {
+      state.classList.add('is-error');
+      state.textContent = 'Failed: ' + (f.error || 'unknown error') + (count > 0 ? ' (previous cards kept)' : '');
+      action = { label: 'Retry' };
+    }
+    if (state.childNodes.length) kids.push(state);
+    if (action) {
+      var b = el('button', { class: 'btn btn-sm fc-btn', type: 'button', text: action.label });
+      b.addEventListener('click', async function () {
+        if (action.regenerate && !confirm('Regenerate the flashcards for "' + (l.title || l.id) + '"? The current cards are replaced.')) return;
+        b.disabled = true;
+        try {
+          var upd = await ST.api('/api/lectures/' + ST.enc(l.id) + '/flashcards', { method: 'POST' });
+          update(upd);
+          schedulePoll(true);
+        } catch (e) {
+          r.message.textContent = 'Flashcards: ' + e.message;
+          r.message.hidden = false;
+          r.message.classList.add('is-error');
+          b.disabled = false;
+        }
+      });
+      kids.push(b);
+    }
+    r.fc.replaceChildren.apply(r.fc, kids);
+  }
+
   function update(l) {
     var c = cards.get(l.id);
     if (!c) return;
@@ -160,6 +238,8 @@
     r.prepare.hidden = !canPrepare;
     r.prepare.disabled = false;
     r.prepare.textContent = status === 'incomplete' ? 'Retry failed slides' : 'Prepare lecture';
+
+    renderFlashcards(l, r);
 
     // context files
     var ctx = l.context_files || [];
@@ -304,7 +384,7 @@
   }
   function schedulePoll(force) {
     clearTimeout(pollTimer);
-    var busy = lastList.some(function (l) { return ST.isBusy(l.status); });
+    var busy = lastList.some(function (l) { return ST.isBusy(l.status) || fcBusy(l); });
     if (busy || force) {
       pollTimer = setTimeout(function () { loadStatus(); load(); }, 2000);
     }

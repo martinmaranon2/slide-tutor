@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slide Tutor · Flashcards</title>
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="/static/vendor/highlight/styles/github.min.css">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="fc-page">
+<header class="topbar">
+  <a class="brand" href="/">Slide Tutor</a>
+  <nav id="crumbs" class="title crumbs" aria-label="Breadcrumb">Loading…</nav>
+  <span class="spacer"></span>
+</header>
+
+<main class="fc-wrap">
+  <section class="fc-sheet" aria-labelledby="fc-heading">
+    <h1 id="fc-heading" class="fc-heading">Flashcards</h1>
+    <p id="fc-prov" class="fc-prov" hidden></p>
+
+    <div id="fc-status" class="fc-status" role="status" hidden></div>
+
+    <div id="fc-toolbar" class="fc-toolbar" hidden>
+      <button id="fc-toggle-all" class="btn btn-sm" type="button" aria-pressed="false">Show all answers</button>
+      <span class="grow"></span>
+      <a id="fc-download" class="btn btn-sm" download>Download .txt</a>
+      <button id="fc-action" class="btn btn-sm" type="button" hidden></button>
+    </div>
+
+    <div id="fc-msg" class="fc-msg" role="status">Loading…</div>
+    <ol id="fc-list" class="fc-list" aria-label="Flashcards"></ol>
+  </section>
+</main>
+
+<script src="/static/vendor/katex/katex.min.js"></script>
+<script src="/static/vendor/marked/marked.min.js"></script>
+<script src="/static/vendor/dompurify/purify.min.js"></script>
+<script src="/static/vendor/highlight/highlight.min.js"></script>
+<script src="/static/common.js"></script>
+<script src="/static/flashcards.js"></script>
+</body>
+</html>
