@@ -37,9 +37,9 @@ import storage
 log = logging.getLogger("slide_tutor.llm")
 
 NOTES_MODEL = os.environ.get("NOTES_MODEL", "claude-sonnet-5-5")
-CHAT_MODEL = os.environ.get("CHAT_MODEL", "claude-sonnet-5-5")
+CHAT_MODEL = os.environ.get("CHAT_MODEL", "claude-opus-5-5")
 NOTES_EFFORT = os.environ.get("NOTES_EFFORT", "medium")
-CHAT_EFFORT = os.environ.get("CHAT_EFFORT", "medium")
+CHAT_EFFORT = os.environ.get("CHAT_EFFORT", "high")
 MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "5"))
 
 # Empty working directory for the CLI so no project files/CLAUDE.md are ever picked up.

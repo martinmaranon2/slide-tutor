@@ -194,12 +194,14 @@ Environment variables (all optional):
 |---|---|---|
 | `LECTURES_DIR` | `./lectures` | where subject folders live (e.g. a folder in your study directory) |
 | `AUTO_PREPARE` | `1` | `0`: new folders are processed but notes wait for **Prepare lecture** |
-| `NOTES_MODEL` / `CHAT_MODEL` | `claude-sonnet-5-5` | model for notes / chat |
-| `NOTES_EFFORT` / `CHAT_EFFORT` | `medium` | `low` … `max`; higher means more thinking and more plan usage |
+| `NOTES_MODEL` / `NOTES_EFFORT` | `claude-sonnet-5-5` / `medium` | model and effort for the notes |
+| `CHAT_MODEL` / `CHAT_EFFORT` | `claude-opus-5-5` / `high` | model and effort for questions in the Ask tab |
 | `CONCURRENCY` | `4` | parallel note generations, shared by all lectures |
 | `FLASHCARDS_COUNT` / `FLASHCARDS_MODEL` / `FLASHCARDS_EFFORT` | `50` / notes model / `high` | flashcards per deck, and the model for them |
 | `MAX_ATTEMPTS` | `5` | tries per slide on overload errors (backoff 2 s, 4 s, 8 s, …) |
 | `HOST` / `PORT` | `127.0.0.1` / `8000` | server address |
+
+Effort is `low` … `max`; higher means more thinking and more plan usage.
 
 Example: `LECTURES_DIR=~/Courses/HPC/lectures NOTES_EFFORT=high uv run app.py`
 
