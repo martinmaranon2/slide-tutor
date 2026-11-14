@@ -52,7 +52,28 @@ async def lifespan(_app: FastAPI):
     watcher.cancel()
 
 
+class NoStaleFrontend:
+    """Pages and static files get "Cache-Control: no-cache": the browser revalidates them on every load (a cheap 304
+    locally) instead of guessing a freshness lifetime and running an old library.js for hours after an update."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get("path", "") if scope["type"] == "http" else ""
+        if not (path == "/" or path.startswith(("/static/", "/lecture/"))):
+            return await self.inner(scope, receive, send)
+
+        async def send_no_cache(message):
+            if message["type"] == "http.response.start":
+                headers = [(k, v) for k, v in message.get("headers", []) if k.lower() != b"cache-control"]
+                message = {**message, "headers": headers + [(b"cache-control", b"no-cache")]}
+            await send(message)
+        await self.inner(scope, receive, send_no_cache)
+
+
 app = FastAPI(title="slide-tutor", lifespan=lifespan)
+app.add_middleware(NoStaleFrontend)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

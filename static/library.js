@@ -274,28 +274,53 @@
 
   function natCmp(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }); }
 
-  /* ---------- subject filter: '' = all subjects; kept in the URL (#subject=…) and localStorage ---------- */
-  var SUBJ_KEY = 'st.libSubject';
+  /* ---------- filters: subject ('' = all) and type ('' = both, 'lecture', 'recitation').
+     Kept in the URL (#subject=…&kind=…) and in localStorage. ---------- */
+  var SUBJ_KEY = 'st.libSubject', KIND_KEY = 'st.libKind';
+  var KIND_NAMES = { lecture: 'Lectures', recitation: 'Recitations' };
   var tabsEl = document.getElementById('subject-tabs');
-  var current = readSelected();
+  var kindEl = document.getElementById('kind-filter');
+  var current = '', kindSel = '';
+  readFilters();
 
-  function readSelected() {
-    var m = /^#subject=(.*)$/.exec(location.hash);
-    if (m) { try { return decodeURIComponent(m[1]); } catch (e) { /* bad hash */ } }
-    try { return localStorage.getItem(SUBJ_KEY) || ''; } catch (e) { return ''; }
+  function readFilters() {
+    var h = location.hash.replace(/^#/, '');
+    if (/(^|&)(subject|kind)=/.test(h)) {
+      var q = new URLSearchParams(h);
+      current = q.get('subject') || '';
+      kindSel = q.get('kind') || '';
+    } else {
+      try { current = localStorage.getItem(SUBJ_KEY) || ''; kindSel = localStorage.getItem(KIND_KEY) || ''; } catch (e) { /* no storage */ }
+    }
+    if (!KIND_NAMES[kindSel]) kindSel = '';
   }
-  function select(name) {
-    current = name;
-    try { localStorage.setItem(SUBJ_KEY, name); } catch (e) {}
-    history.replaceState(null, '', name ? '#subject=' + encodeURIComponent(name) : location.pathname + location.search);
-    if (name) document.getElementById('subject').value = name;
+  function saveFilters() {
+    try { localStorage.setItem(SUBJ_KEY, current); localStorage.setItem(KIND_KEY, kindSel); } catch (e) {}
+    var q = new URLSearchParams();
+    if (current) q.set('subject', current);
+    if (kindSel) q.set('kind', kindSel);
+    var h = q.toString().replace(/\+/g, '%20');
+    history.replaceState(null, '', h ? '#' + h : location.pathname + location.search);
     lastLayout = null;
     render(lastList);
   }
-  window.addEventListener('hashchange', function () { current = readSelected(); lastLayout = null; render(lastList); });
+  function select(name) {
+    current = name;
+    if (name) document.getElementById('subject').value = name;
+    saveFilters();
+  }
+  function selectKind(kind) {
+    kindSel = kind;
+    var r = kind && form.querySelector('input[name=kind][value=' + kind + ']');
+    if (r) r.checked = true;
+    saveFilters();
+  }
+  window.addEventListener('hashchange', function () { readFilters(); lastLayout = null; render(lastList); });
+
+  function kindsShown() { return kindSel ? [kindSel] : ['lecture', 'recitation']; }
+  function countIn(g) { return kindsShown().reduce(function (c, k) { return c + g[k].length; }, 0); }
 
   function renderTabs(names, groups) {
-    if (names.length < 2) { tabsEl.hidden = true; tabsEl.replaceChildren(); return; }
     var total = 0;
     function tab(value, label, count) {
       return el('button', { type: 'button', class: 'subject-tab', 'aria-pressed': String(value === current),
@@ -303,13 +328,20 @@
         el('span', { text: label }), el('span', { class: 'n', text: String(count) }));
     }
     var tabs = names.map(function (n) {
-      var g = groups.get(n), c = g.lecture.length + g.recitation.length;
+      var c = countIn(groups.get(n));
       total += c;
       return tab(n, n, c);
     });
-    tabs.unshift(tab('', 'All subjects', total));
-    tabsEl.replaceChildren.apply(tabsEl, tabs);
-    tabsEl.hidden = false;
+    if (names.length < 2) tabsEl.replaceChildren();
+    else { tabs.unshift(tab('', 'All subjects', total)); tabsEl.replaceChildren.apply(tabsEl, tabs); }
+    tabsEl.hidden = names.length < 2;
+
+    var opts = [['', 'All'], ['lecture', 'Lectures'], ['recitation', 'Recitations']];
+    kindEl.replaceChildren.apply(kindEl, opts.map(function (o) {
+      return el('button', { type: 'button', class: 'kind-opt', 'aria-pressed': String(o[0] === kindSel),
+                            onclick: function () { selectKind(o[0]); } }, o[1]);
+    }));
+    kindEl.hidden = !names.length;
   }
 
   function render(lectures) {
@@ -334,8 +366,9 @@
     }
     var names = Array.from(groups.keys()).sort(natCmp);
     if (current && names.indexOf(current) < 0) current = '';   // subject folder gone or renamed
-    var shown = current ? [current] : names;
-    var layout = current + '#' + names.map(function (n) {
+    // all subjects + one type: leave out subjects that have nothing of that type
+    var shown = current ? [current] : names.filter(function (n) { return !kindSel || countIn(groups.get(n)); });
+    var layout = current + '#' + kindSel + '#' + names.map(function (n) {
       var g = groups.get(n);
       return n + ':' + sortL(g.lecture).map(function (l) { return l.id; }).join(',') +
         '/' + sortL(g.recitation).map(function (l) { return l.id; }).join(',');
@@ -345,15 +378,22 @@
 
     renderTabs(names, groups);
     if (!lectures.length && !subjects.length) { showEmpty(); return; }
+    if (!shown.length) {
+      listEl.replaceChildren(el('div', { class: 'empty', text: 'No ' + KIND_NAMES[kindSel].toLowerCase() + ' in any subject yet.' }));
+      return;
+    }
     listEl.replaceChildren.apply(listEl, shown.map(function (n) {
       var g = groups.get(n);
       var kids = [el('h2', { class: 'subject-title', text: n })];
-      [['lecture', 'Lectures'], ['recitation', 'Recitations']].forEach(function (k) {
-        if (!g[k[0]].length) return;
-        kids.push(el('h3', { class: 'kind-title', text: k[1] }));
-        kids.push(el('div', { class: 'lectures' }, g[k[0]].map(function (l) { return cards.get(l.id).root; })));
+      kindsShown().forEach(function (k) {
+        if (!g[k].length) return;
+        kids.push(el('h3', { class: 'kind-title', text: KIND_NAMES[k] }));
+        kids.push(el('div', { class: 'lectures' }, g[k].map(function (l) { return cards.get(l.id).root; })));
       });
-      if (kids.length === 1) kids.push(el('div', { class: 'subject-empty', text: 'No slides yet' }));
+      if (kids.length === 1) {
+        kids.push(el('div', { class: 'subject-empty',
+          text: kindSel ? 'No ' + KIND_NAMES[kindSel].toLowerCase() + ' yet' : 'No slides yet' }));
+      }
       return el('section', { class: 'subject-section', dataset: { subject: n } }, kids);
     }));
   }
@@ -414,7 +454,9 @@
       await ST.api('/api/lectures', { method: 'POST', body: fd });
       try { localStorage.setItem('st.lastSubject', subject); localStorage.setItem('st.lastKind', kind); } catch (e2) {}
       form.reset();
-      if (current && current !== subject) select(subject);   // show the subject the deck went into
+      if ((current && current !== subject) || (kindSel && kindSel !== kind)) {   // show where the deck went
+        current = current && subject; kindSel = kindSel && kind; saveFilters();
+      }
       document.getElementById('subject').value = subject;
       var kr = form.querySelector('input[name=kind][value=' + kind + ']'); if (kr) kr.checked = true;
       document.getElementById('autostart').checked = true;
@@ -434,7 +476,7 @@
     if (ls) document.getElementById('subject').value = ls;
   } catch (e) {}
   try {
-    var lk = localStorage.getItem('st.lastKind');
+    var lk = kindSel || localStorage.getItem('st.lastKind');
     var kr0 = lk && form.querySelector('input[name=kind][value=' + lk + ']');
     if (kr0) kr0.checked = true;
   } catch (e) {}

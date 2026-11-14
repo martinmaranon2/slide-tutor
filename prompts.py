@@ -222,9 +222,10 @@ def flashcards_request(lid: str, slides: list[dict], count: int) -> tuple[list[d
     kind = "recitation (exercise session) slides" if meta.get("kind") == "recitation" else "lecture slides"
     lecture = (f'<lecture subject="{storage.subject_of(lid)}" title="{meta["title"]}" type="{kind}" '
                f'slides="{len(slides)}">\n' + "\n".join(blocks) + "\n</lecture>")
-    task = (f"Write {count} flashcards for this lecture now ({count} is the student's standard per lecture; if the "
-            "material clearly has fewer distinct exam-relevant ideas, write fewer rather than near-duplicates). Cover "
-            "the whole lecture, weighted by what the past exams test. Output only the cards, one per line.")
+    task = (f"Write exactly {count} flashcards for this lecture now, not more: {count} is the student's standard per "
+            "lecture. Only if the material clearly has fewer distinct exam-relevant ideas, write fewer rather than "
+            "near-duplicates. Cover the whole lecture, weighted by what the past exams test. Output only the cards, one "
+            "per line.")
     content = [text_block(lecture), text_block(task)]
     info = {"slides": len(slides), "slide_text_chars": text_total, "notes_chars": notes_chars,
             "notes_trimmed": trimmed, "notes_limit_per_slide": per_slide}

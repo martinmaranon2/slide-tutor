@@ -51,7 +51,8 @@
       t.appendChild(el('a', { class: 'subject', href: '/#subject=' + encodeURIComponent(l.subject), text: l.subject,
                               title: 'All ' + l.subject + ' slides' }));
       t.appendChild(el('span', { class: 'sep', text: ' › ' }));
-      t.appendChild(el('span', { class: 'kindname', text: kindName }));
+      t.appendChild(el('a', { class: 'kindname', text: kindName, title: 'All ' + l.subject + ' ' + kindName.toLowerCase(),
+                              href: '/#subject=' + encodeURIComponent(l.subject) + '&kind=' + (l.kind === 'recitation' ? 'recitation' : 'lecture') }));
       t.appendChild(el('span', { class: 'sep', text: ' › ' }));
     }
     t.appendChild(document.createTextNode(title));

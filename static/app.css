@@ -190,9 +190,20 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--petrol); }
 .field .radio { display: flex; gap: 8px; align-items: center; margin: 0 0 4px; font-size: 14px; }
 
 /* subject filter: a row of tabs across the top of the index sheet */
-.subject-tabs {
-  display: flex; flex-wrap: wrap; gap: 0 24px; margin: -8px 0 30px; border-bottom: 1px solid var(--line);
+.lib-filters {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 24px;
+  margin: -8px 0 30px; border-bottom: 1px solid var(--line);
 }
+.subject-tabs { display: flex; flex-wrap: wrap; gap: 0 24px; min-width: 0; }
+.kind-filter { display: inline-flex; margin: 0 0 7px auto; border: 1px solid #c9ced5; border-radius: 5px; overflow: hidden; }
+.kind-opt {
+  appearance: none; border: none; background: var(--surface); padding: 4px 11px; cursor: pointer;
+  font: 500 13px var(--sans); color: var(--muted);
+}
+.kind-opt + .kind-opt { border-left: 1px solid #c9ced5; }
+.kind-opt:hover { color: var(--ink); }
+.kind-opt[aria-pressed="true"] { background: var(--petrol-wash); color: var(--petrol-ink); font-weight: 600; }
+.kind-opt:focus-visible { outline-offset: -2px; }
 .subject-tab {
   appearance: none; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
   padding: 9px 0 8px; display: inline-flex; gap: 7px; align-items: baseline; cursor: pointer;
@@ -201,7 +212,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--petrol); }
 .subject-tab:hover { color: var(--ink); }
 .subject-tab[aria-pressed="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--petrol); }
 .subject-tab .n { font-size: 12px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
-.topbar .title a.subject:hover { color: #fff; }
+.topbar .title a.subject:hover, .topbar .title a.kindname:hover { color: #fff; }
 
 /* subjects → kinds → decks */
 .lib-wrap > .lib-main > .lectures, .lib-main > .lectures { display: grid; gap: 44px; margin: 0; }

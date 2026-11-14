@@ -87,7 +87,8 @@ The app renders the slides, extracts the text and starts writing notes. A progre
   when uploading), then press **Prepare lecture**.
 - PDFs anywhere else (directly in `lectures/`, in a subject folder, or another subfolder except an exams folder) are
   ignored; the library lists them so you can move them.
-- The library has a tab per subject, so you only see that subject's decks; it remembers your last choice.
+- The library has a tab per subject and an *All / Lectures / Recitations* switch, so you only see what you need; it
+  remembers your last choice. In the reader, the subject and type in the top bar link back to that filtered list.
 
 ### 2. Read
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slide Tutor · Library</title>
-<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/app.css?v=20261114c">
 </head>
 <body>
 <header class="topbar">
@@ -17,7 +17,10 @@
   <section class="lib-main" aria-labelledby="lib-heading">
     <h2 id="lib-heading" class="sr-only">Your lectures</h2>
     <div id="loose-warning" class="warn-box" role="status" hidden></div>
-    <nav id="subject-tabs" class="subject-tabs" aria-label="Subjects" hidden></nav>
+    <div class="lib-filters">
+      <nav id="subject-tabs" class="subject-tabs" aria-label="Subjects" hidden></nav>
+      <div id="kind-filter" class="kind-filter" role="group" aria-label="Show slide type" hidden></div>
+    </div>
     <div id="lectures" class="lectures"><div class="empty">Loading…</div></div>
   </section>
 
@@ -62,7 +65,7 @@
   </aside>
 </main>
 
-<script src="/static/common.js"></script>
-<script src="/static/library.js"></script>
+<script src="/static/common.js?v=20261114c"></script>
+<script src="/static/library.js?v=20261114c"></script>
 </body>
 </html>
